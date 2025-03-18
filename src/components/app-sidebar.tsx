@@ -12,6 +12,7 @@ import {
   PieChart,
   Settings2,
   SquareTerminal,
+  Home,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -52,92 +53,72 @@ const data = {
   ],
   navMain: [
     {
-      title: "Playground",
-      url: "#",
-      icon: SquareTerminal,
+      title: "Dashboard",
+      url: "/",
+      icon: Home,
       isActive: true,
       items: [
         {
-          title: "History",
-          url: "#",
+          title: "Inicio",
+          url: "/dashboard",
         },
         {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
+          title: "Estadísticas",
+          url: "/dashboard/estadisticas",
+        }
       ],
     },
     {
-      title: "Models",
+      title: "Gestión de Usuarios",
       url: "#",
       icon: Bot,
       items: [
         {
-          title: "Genesis",
-          url: "#",
+          title: "Administradores",
+          url: "/dashboard/admin",
         },
         {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
+          title: "Voluntarios",
+          url: "/dashboard/volunteers",
         },
       ],
     },
     {
-      title: "Documentation",
+      title: "Registros de Asistencia",
       url: "#",
       icon: BookOpen,
       items: [
         {
-          title: "Introduction",
-          url: "#",
+          title: "Ver Registros",
+          url: "/dashboard/registros",
         },
         {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
+          title: "Reportes Diarios",
+          url: "/dashboard/reportes-diarios",
         },
       ],
     },
     {
-      title: "Settings",
+      title: "Configuración",
       url: "#",
       icon: Settings2,
       items: [
         {
-          title: "General",
-          url: "#",
+          title: "Roles y Permisos",
+          url: "/dashboard/roles",
         },
         {
-          title: "Team",
-          url: "#",
+          title: "Tarjetas RFID",
+          url: "/dashboard/tarjetas",
         },
         {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
+          title: "Universidades",
+          url: "/dashboard/universidades",
         },
       ],
     },
   ],
-  projects: [
+ /*  projects: [
     {
       name: "Design Engineering",
       url: "#",
@@ -153,7 +134,7 @@ const data = {
       url: "#",
       icon: Map,
     },
-  ],
+  ], */
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -164,7 +145,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
+        {/* <NavProjects projects={data.projects} /> */}
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />
