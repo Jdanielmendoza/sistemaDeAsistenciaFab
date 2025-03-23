@@ -1,9 +1,11 @@
-import React from 'react'
+import Stepper from "./Stepper"
 
-const Page = () => {
+const page = () => {
   return (
-    <div>page</div>
+    <div className="w-ful pt-10" >
+      <Stepper/>
+    </div>
   )
 }
 
-export default Page
+export default page

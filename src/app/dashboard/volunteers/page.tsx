@@ -1,6 +1,6 @@
 "use client"
 
-import * as React from "react"
+import { useEffect, useState } from "react"
 import {
     ColumnDef,
     ColumnFiltersState,
@@ -13,8 +13,18 @@ import {
     getSortedRowModel,
     useReactTable,
 } from "@tanstack/react-table"
-import { ArrowUpDown, Columns2Icon, CopyIcon, EditIcon, EyeIcon, MoreHorizontal } from "lucide-react"
-
+import { ArrowUpDown, Columns2Icon, CopyIcon, EditIcon, EyeIcon, MoreHorizontal, TrashIcon } from "lucide-react"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -36,65 +46,21 @@ import {
 } from "@/components/ui/table"
 import { toast } from "sonner"
 import Link from "next/link"
-
-const data: Volunteer[] = [
-    {
-        id: "1",
-        nombre: "Juan Pérez",
-        correo: "juan.perez@example.com",
-        telefono: 1234567890,
-        universidad: "Universidad Nacional"
-    },
-    {
-        id: "2",
-        nombre: "María Gómez",
-        correo: "maria.gomez@example.com",
-        telefono: 987654321,
-        universidad: "Universidad de Buenos Aires"
-    },
-    {
-        id: "3",
-        nombre: "Carlos Ruiz",
-        correo: "carlos.ruiz@example.com",
-        telefono: 5551234567,
-        universidad: "Universidad de Chile"
-    },
-    {
-        id: "4",
-        nombre: "Jose Daniel Mendoza Guzman",
-        correo: "jdanielmendoza987z@gmail.com",
-        telefono: 71024318,
-        universidad: "Universidad Autonoma Gabriel Rene Moreno"
-    },
-];
-
+import { Skeleton } from "@/components/ui/skeleton"
 
 export type Volunteer = {
-    id: string
-    nombre: string
-    correo: string
-    telefono: number
-    universidad: string
+    id_user: string
+    user_name: string
+    email: string
+    birthdate: string
+    phone_number: number
+    university_name: string
+    role_name: string
 }
 
-export const columns: ColumnDef<Volunteer>[] = [
+export const createColumns = (setOpen: React.Dispatch<React.SetStateAction<boolean>>, SetVolunteerSelected: React.Dispatch<React.SetStateAction<Volunteer>>): ColumnDef<Volunteer>[] => [
     {
-        id: "select",
-        /*  header: ({ table }) => (
-           <Checkbox
-             checked={
-               table.getIsAllPageRowsSelected() ||
-               (table.getIsSomePageRowsSelected() && "indeterminate")
-             }
-             onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-             aria-label="Select all"
-           />
-         ), */
-        enableSorting: false,
-        enableHiding: false,
-    },
-    {
-        accessorKey: "nombre",
+        accessorKey: "user_name",
         header: ({ column }) => {
             return (
                 <Button
@@ -107,11 +73,11 @@ export const columns: ColumnDef<Volunteer>[] = [
             )
         },
         cell: ({ row }) => (
-            <div className="capitalize truncate max-w-[180px] ">{row.getValue("nombre")}</div>
+            <div className="capitalize truncate max-w-[220px] ">{row.getValue("user_name")}</div>
         ),
     },
     {
-        accessorKey: "correo",
+        accessorKey: "email",
         header: ({ column }) => {
             return (
                 <Button
@@ -123,20 +89,20 @@ export const columns: ColumnDef<Volunteer>[] = [
                 </Button>
             )
         },
-        cell: ({ row }) => <div className="lowercase">{row.getValue("correo")}</div>,
+        cell: ({ row }) => <div className="lowercase">{row.getValue("email")}</div>,
     },
     {
-        accessorKey: "telefono",
+        accessorKey: "phone_number",
         header: () => "Teléfono",
         cell: ({ row }) => {
-            return <div >{row.getValue("telefono")}</div>
+            return <div >{row.getValue("phone_number")}</div>
         },
     },
     {
-        accessorKey: "universidad",
+        accessorKey: "university_name",
         header: "Universidad",
         cell: ({ row }) => (
-            <div className="capitalize truncate max-w-[200px]">{row.getValue("universidad")}</div>
+            <div className="capitalize truncate max-w-[200px]">{row.getValue("university_name")}</div>
         ),
     },
     {
@@ -156,40 +122,100 @@ export const columns: ColumnDef<Volunteer>[] = [
                     <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                         <DropdownMenuItem
-                            onClick={async() => {
-                                await navigator.clipboard.writeText(Volunteer.correo)
-                                toast.success("Se copio el correo al portapapeles",{
-                                    duration:3000,
+                            onClick={async () => {
+                                await navigator.clipboard.writeText(Volunteer.email)
+                                toast.success("Se copio el correo al portapapeles", {
+                                    duration: 3000,
                                     style: {
                                         background: '#bbf7d0',
-                                      },
+                                    },
                                 })
                             }}
                         >
-                           <CopyIcon/> Copiar Correo
-                            
+                            <CopyIcon /> Copiar Correo
+
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem><EyeIcon/> <Link href={"volunteers/"+Volunteer.id}>Ver perfil</Link> </DropdownMenuItem>
-                        <DropdownMenuItem><EditIcon/> Editar perfil</DropdownMenuItem>
+                        <DropdownMenuItem><EyeIcon /> <Link href={"volunteers/" + Volunteer.id_user}>Ver perfil</Link> </DropdownMenuItem>
+                        <DropdownMenuItem><EditIcon /> Editar perfil</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setOpen(true); console.log(Volunteer.id_user); SetVolunteerSelected(Volunteer) }}>
+                            <TrashIcon /> Eliminar
+                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             )
         },
     },
 ]
+export function DeleteConfirmation({
+    open,
+    setOpen,
+    volunteerSelected,
+    refreshVolunteers
+}: {
+    open: boolean;
+    setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    volunteerSelected: Volunteer;
+    refreshVolunteers: () => void;
+}) {
+    return (
+        <AlertDialog open={open} onOpenChange={setOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Esta acción no se puede deshacer.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setOpen(false)}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={async () => {
+                        console.log("Eliminar usuario...");
+                        try {
+                            const response = await fetch("http://localhost:3000/api/users", {
+                                method: "DELETE",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ id_user: volunteerSelected.id_user }),
+                            });
+
+                            if (!response.ok) {
+                                throw new Error("Error al eliminar el voluntario");
+                            }
+
+                            toast.success(`Eliminado: ${volunteerSelected.user_name}`, { duration: 3000 });
+
+                            setOpen(false);
+                            refreshVolunteers(); // Recargar la lista después de eliminar
+                        } catch (error) {
+                            toast.error("No se pudo eliminar el voluntario");
+                            console.error(error);
+                        }
+                    }}>
+                        Continuar
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+}
+
 
 export function DataTableDemo() {
-    const [sorting, setSorting] = React.useState<SortingState>([])
-    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
+    const [volunteerSelected, setVolunteerSelected] = useState<Volunteer>(volunteers[0]);
+    const [isLoading, setIsloading] = useState<Boolean>(false);
+    const [sorting, setSorting] = useState<SortingState>([])
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(
         []
     )
     const [columnVisibility, setColumnVisibility] =
-        React.useState<VisibilityState>({})
-    const [rowSelection, setRowSelection] = React.useState({})
-
-    const table = useReactTable({
-        data,
+        useState<VisibilityState>({})
+    const [rowSelection, setRowSelection] = useState({})
+    const [open, setOpen] = useState(false); //el dialog de eliminar voluntario
+    const columns = createColumns(setOpen, setVolunteerSelected);
+    const table = useReactTable<Volunteer>({
+        data: volunteers,
         columns,
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
@@ -207,21 +233,36 @@ export function DataTableDemo() {
         },
     })
 
+    const fetchVolunteers = async () => {
+        try {
+            setIsloading(true);
+            const result = await fetch("http://localhost:3000/api/users");
+            const data = await result.json();
+            setVolunteers(data);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsloading(false);
+        }
+    }
+    useEffect(() => {
+        fetchVolunteers();
+    }, [])
     return (
         <div className="w-full">
             <div className="flex items-center gap-2 py-4">
                 <Input
                     placeholder="Filtrar nombres..."
-                    value={(table.getColumn("nombre")?.getFilterValue() as string) ?? ""}
+                    value={(table.getColumn("user_name")?.getFilterValue() as string) ?? ""}
                     onChange={(event) =>
-                        table.getColumn("nombre")?.setFilterValue(event.target.value)
+                        table.getColumn("user_name")?.setFilterValue(event.target.value)
                     }
                     className="max-w-sm"
                 />
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="ml-auto">
-                           <Columns2Icon/>
+                            <Columns2Icon />
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -283,13 +324,23 @@ export function DataTableDemo() {
                                     ))}
                                 </TableRow>
                             ))
-                        ) : (
+                        ) : isLoading ? <TableRow>
+                            <TableCell
+                                colSpan={columns.length}
+                                className="h-24"
+                            >
+                                <Skeleton className="h-8 mt-1" />
+                                <Skeleton className="h-8 mt-1" />
+                                <Skeleton className="h-8 mt-1" />
+                                <Skeleton className="h-8 mt-1" />
+                            </TableCell>
+                        </TableRow> : (
                             <TableRow>
                                 <TableCell
                                     colSpan={columns.length}
                                     className="h-24 text-center"
                                 >
-                                    No results.
+                                    No hay resultados
                                 </TableCell>
                             </TableRow>
                         )}
@@ -320,7 +371,9 @@ export function DataTableDemo() {
                     </Button>
                 </div>
             </div>
+            <DeleteConfirmation open={open} setOpen={setOpen} volunteerSelected={volunteerSelected}  refreshVolunteers={fetchVolunteers} />
         </div>
+
     )
 }
 
