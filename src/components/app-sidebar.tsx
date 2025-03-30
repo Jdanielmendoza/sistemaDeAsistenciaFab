@@ -27,7 +27,6 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
-// This is sample data.
 const data = {
   user: {
     name: "shadcn",
@@ -109,7 +108,7 @@ const data = {
         },
         {
           title: "Tarjetas RFID",
-          url: "/dashboard/tarjetas",
+          url: "/dashboard/rfidCards",
         },
         {
           title: "Universidades",

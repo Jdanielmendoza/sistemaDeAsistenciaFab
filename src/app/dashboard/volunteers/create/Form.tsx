@@ -1,7 +1,5 @@
 "use client"
 
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { useContext, useEffect, useState } from "react"
 import { format } from "date-fns"
@@ -15,47 +13,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { useRouter } from 'next/navigation'
-import { ContextSelectedTab,StepperSelected } from "./Stepper"
-const formSchema = z.object({
-  name: z.string().min(2, {
-    message: "El nombre debería tener al menos 2 caracteres.",
-  }),
-  email: z.coerce.string().email("El correo no es valido").min(5, {
-    message: "El correo debería tener al menos 5 caracteres",
-  }),
-  birthdate: z.date({
-    required_error: "La fecha de nacimiento es requerida.",
-  }),
-  password: z.string().min(6, {
-    message: "La contraseña debería tener al menos 6 caracteres",
-  }),
-  phone_number: z.coerce.number().positive("El número debe ser positivo"),
-  id_university: z.string().optional(),
-  id_role: z.string().uuid(),
-})
-
-interface Iuniversity {
-  id: string
-  name: string
-}
-
+import { ContextSelectedTab,StepperSelected} from "./Stepper"
+import { formUserSchema as formSchema, Iuniversity } from "@/types/user"
 export default function ProfileForm() {
   const [universities, setUniversities] = useState<Iuniversity[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter(); 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      birthdate: new Date("2000-08-21"),
-      password: "",
-      id_role: "b72ae401-6234-4039-978b-a089f81d7e05",
-    },
-  })
 
-  const {setTabSelected} = useContext(ContextSelectedTab); 
+  const {setTabSelected,userForm} = useContext(ContextSelectedTab); 
   const getUniversities = async () => {
     try {
       setIsLoading(true)
@@ -94,6 +58,8 @@ export default function ProfileForm() {
         }
         const data = await response.json();
         console.log("Voluntario registrado exitosamente:", data);
+        console.log(data.id_user);
+        userForm.setValue('id_user',data.id_user); 
     } catch (error) {
         console.error("Error:", error);
     } finally {
@@ -117,12 +83,12 @@ export default function ProfileForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <Form {...userForm}>
+          <form onSubmit={userForm.handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Nombre */}
               <FormField
-                control={form.control}
+                control={userForm.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
@@ -137,7 +103,7 @@ export default function ProfileForm() {
 
               {/* Fecha de nacimiento */}
               <FormField
-                control={form.control}
+                control={userForm.control}
                 name="birthdate"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
@@ -174,7 +140,7 @@ export default function ProfileForm() {
 
               {/* Correo */}
               <FormField
-                control={form.control}
+                control={userForm.control}
                 name="email"
                 render={({ field }) => (
                   <FormItem>
@@ -189,7 +155,7 @@ export default function ProfileForm() {
 
               {/* Teléfono - Fixed the name from password to phone_number */}
               <FormField
-                control={form.control}
+                control={userForm.control}
                 name="phone_number"
                 render={({ field }) => (
                   <FormItem>
@@ -211,7 +177,7 @@ export default function ProfileForm() {
 
               {/* Contraseña */}
               <FormField
-                control={form.control}
+                control={userForm.control}
                 name="password"
                 render={({ field }) => (
                   <FormItem>
@@ -226,7 +192,7 @@ export default function ProfileForm() {
 
               {/* Universidad */}
               <FormField
-                control={form.control}
+                control={userForm.control}
                 name="id_university"
                 render={({ field }) => (
                   <FormItem>

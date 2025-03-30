@@ -17,10 +17,8 @@ export async function GET() {
 
 export async function POST(req:Request) {
     try {
-        const { cardCode } = await req.json(); 
-        const newCardId = uuidv4(); 
-
-        const result = await query(queries.cards.createCard,[newCardId,cardCode])
+        const { name,id_user } = await req.json(); 
+        const result = await query(queries.cards.createCard,[name,id_user])
         return NextResponse.json(result.rows[0],{status : 201})
     } catch (error) {
         return NextResponse.json({error : "error creando la tarjeta"+ error}, {status : 500})  
