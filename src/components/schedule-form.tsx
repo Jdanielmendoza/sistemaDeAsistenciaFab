@@ -29,12 +29,12 @@ const daysOfWeek = [
 ]
 
 export function ScheduleForm() {
-  const {userForm } = useContext(ContextSelectedTab);
+  const { userForm } = useContext(ContextSelectedTab);
   const [selectedDays, setSelectedDays] = useState<string[]>([])
   const [timesByDay, setTimesByDay] = useState<Record<string, { startTime: string; endTime: string }>>({})
   const [startDate, setStartDate] = useState<Date>()
-  const [endDate, setEndDate] = useState<Date>()
-
+  const [endDate, setEndDate] = useState<Date>();
+  const [isLoading, setIsLoading] = useState<Boolean>(false);
   const handleDayToggle = (values: string[]) => {
     setSelectedDays(values)
 
@@ -70,7 +70,7 @@ export function ScheduleForm() {
     e.preventDefault()
 
     const scheduleData = selectedDays.map((day) => ({
-      id_user : userForm.getValues('id_user'),
+      id_user: userForm.getValues('id_user'),
       day_of_week: Number.parseInt(day),
       start_time: timesByDay[day].startTime,
       end_time: timesByDay[day].endTime,
@@ -81,27 +81,28 @@ export function ScheduleForm() {
     console.log("Schedule data:", scheduleData)
     const saveSchedule = async () => {
       try {
-      const response = await fetch("http://localhost:3000/api/schedule", {
-        method: "POST",
-        headers: {
-        "Content-Type": "application/json",
-        },
-        body: JSON.stringify(scheduleData),
-      });
+        setIsLoading(true); 
+        const response = await fetch("http://localhost:3000/api/schedule", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(scheduleData),
+        });
 
-      if (!response.ok) {
-        throw new Error("Failed to save schedule");
-      }
+        if (!response.ok) {
+          throw new Error("Failed to save schedule");
+        }
 
-      const data = await response.json();
-      console.log("Schedule saved successfully:", data);
+        const data = await response.json();
+        console.log("Schedule saved successfully:", data);
+        window.location.href = '/dashboard/volunteers'
       } catch (error) {
-      console.error("Error saving schedule:", error);
+        console.error("Error saving schedule:", error);
       }
     };
 
     saveSchedule();
-    // Here you would send the data to your backend
   }
 
   return (
@@ -211,7 +212,7 @@ export function ScheduleForm() {
           <Button
             type="submit"
             className="w-full md:w-auto"
-            disabled={selectedDays.length === 0}
+            disabled={selectedDays.length === 0 || isLoading === true}
           >
             Guardar horario
           </Button>

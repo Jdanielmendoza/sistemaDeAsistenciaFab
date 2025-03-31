@@ -89,11 +89,11 @@ const data = {
       items: [
         {
           title: "Ver Registros",
-          url: "/dashboard/registros",
+          url: "/dashboard/attendance-record",
         },
         {
           title: "Reportes Diarios",
-          url: "/dashboard/reportes-diarios",
+          url: "/dashboard/attendance-reports",
         },
       ],
     },
