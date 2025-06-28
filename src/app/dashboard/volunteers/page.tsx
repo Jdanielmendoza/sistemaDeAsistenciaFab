@@ -48,7 +48,7 @@ import { toast } from "sonner"
 import Link from "next/link"
 import { Skeleton } from "@/components/ui/skeleton"
 
-export type Volunteer = {
+type Volunteer = {
     id_user: string
     user_name: string
     email: string
@@ -58,7 +58,7 @@ export type Volunteer = {
     role_name: string
 }
 
-export const createColumns = (setOpen: React.Dispatch<React.SetStateAction<boolean>>, SetVolunteerSelected: React.Dispatch<React.SetStateAction<Volunteer>>): ColumnDef<Volunteer>[] => [
+const createColumns = (setOpen: React.Dispatch<React.SetStateAction<boolean>>, SetVolunteerSelected: React.Dispatch<React.SetStateAction<Volunteer>>): ColumnDef<Volunteer>[] => [
     {
         accessorKey: "user_name",
         header: ({ column }) => {
@@ -148,7 +148,8 @@ export const createColumns = (setOpen: React.Dispatch<React.SetStateAction<boole
         },
     },
 ]
-export function DeleteConfirmation({
+
+function DeleteConfirmation({
     open,
     setOpen,
     volunteerSelected,
@@ -201,7 +202,7 @@ export function DeleteConfirmation({
 }
 
 
-export function DataTableDemo() {
+function DataTableDemo() {
     const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
     const [volunteerSelected, setVolunteerSelected] = useState<Volunteer>(volunteers[0]);
     const [isLoading, setIsloading] = useState<Boolean>(false);
