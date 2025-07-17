@@ -55,8 +55,8 @@ WHERE id_user = $1 AND check_out_time IS NULL
     if (attendanceResult.rows.length === 0) {
       // Registrar entrada
       const insertQuery = `
-  INSERT INTO AttendanceRecord (id_user, check_in_time)
-  VALUES ($1, NOW() )
+  INSERT INTO AttendanceRecord (id_user, check_in_time, updated_at)
+  VALUES ($1, NOW() AT TIME ZONE 'America/La_Paz', NOW() AT TIME ZONE 'America/La_Paz')
   RETURNING *
 `;
 //validar tiempo de respuesta de entrada y salida .......
@@ -68,7 +68,6 @@ WHERE id_user = $1 AND check_out_time IS NULL
     } else {
       // Registrar salida
       const recordId = attendanceResult.rows[0].id_record;
-      const checkInTime = attendanceResult.rows[0].check_in_time;
 
       const updateQuery = `
   UPDATE AttendanceRecord

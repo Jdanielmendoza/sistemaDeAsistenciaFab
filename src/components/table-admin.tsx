@@ -1,79 +1,55 @@
 'use client';
 
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react";
 
-const estudiantes = [
-  {
-    carnet: "A12345",
-    nombre: "Juan Pérez",
-    correo: "juan.perez@universidad.edu",
-    telefono: "1234-5678",
-    codigoTarjeta: "T001",
-    universidad: "Universidad Central",
-  },
-  {
-    carnet: "B67890",
-    nombre: "María García",
-    correo: "maria.garcia@universidad.edu",
-    telefono: "8765-4321",
-    codigoTarjeta: "T002",
-    universidad: "Universidad del Este",
-  },
-  {
-    carnet: "C13579",
-    nombre: "Carlos Rodríguez",
-    correo: "carlos.rodriguez@universidad.edu",
-    telefono: "9876-5432",
-    codigoTarjeta: "T003",
-    universidad: "Universidad del Norte",
-  },
-]
+type Admin = {
+  id_user: string;
+  user_name: string;
+  email: string;
+  phone_number: number | null;
+  university_name: string;
+};
 
 export function TableAdmin() {
-  const handleEdit = (carnet: string) => {
-    console.log(`Editar estudiante con carnet: ${carnet}`)
-  }
+  const [admins, setAdmins] = useState<Admin[]>([]);
 
-  const handleDelete = (carnet: string) => {
-    console.log(`Eliminar estudiante con carnet: ${carnet}`)
-  }
+  const fetchAdmins = async () => {
+    try {
+      const res = await fetch("/api/users?role=administrador");
+      const data = await res.json();
+      setAdmins(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    fetchAdmins();
+  }, []);
 
   return (
     <Table>
-      <TableCaption>Lista de estudiantes</TableCaption>
+      <TableCaption>Lista de administradores</TableCaption>
       <TableHeader>
         <TableRow>
-          <TableHead>Carnet</TableHead>
           <TableHead>Nombre</TableHead>
           <TableHead>Correo</TableHead>
           <TableHead>Teléfono</TableHead>
-          <TableHead>Código Tarjeta</TableHead>
           <TableHead>Universidad</TableHead>
-          <TableHead>Acciones</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {estudiantes.map((estudiante) => (
-          <TableRow key={estudiante.carnet}>
-            <TableCell>{estudiante.carnet}</TableCell>
-            <TableCell>{estudiante.nombre}</TableCell>
-            <TableCell>{estudiante.correo}</TableCell>
-            <TableCell>{estudiante.telefono}</TableCell>
-            <TableCell>{estudiante.codigoTarjeta}</TableCell>
-            <TableCell>{estudiante.universidad}</TableCell>
-            <TableCell>
-              <Button variant="outline" size="sm" className="mr-2" onClick={() => handleEdit(estudiante.carnet)}>
-                Editar
-              </Button>
-              <Button variant="destructive" size="sm" onClick={() => handleDelete(estudiante.carnet)}>
-                Eliminar
-              </Button>
-            </TableCell>
+        {admins.map((admin) => (
+          <TableRow key={admin.id_user}>
+            <TableCell>{admin.user_name}</TableCell>
+            <TableCell>{admin.email}</TableCell>
+            <TableCell>{admin.phone_number ?? "-"}</TableCell>
+            <TableCell>{admin.university_name}</TableCell>
           </TableRow>
         ))}
       </TableBody>
     </Table>
-  )
+  );
 }
 

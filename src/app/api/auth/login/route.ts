@@ -5,40 +5,58 @@ import jwt from 'jsonwebtoken';
 
 const SECRET_KEY = process.env.JWT_SECRET || 'supersecretkey';
 
+/**
+ * Login endpoint
+ * Body: { email: string; password: string }
+ * Response (200): { token: string; user: { id: string; name: string; email: string; role: string } }
+ */
 export async function POST(req: Request) {
   try {
-    const { correo, contrasena } = await req.json();
+    const { email, password } = await req.json();
 
-    // Verificar si el usuario existe y es un administrador
+    // 1. Verify user exists (any role) – join to get role name in one query
     const result = await query(
-      `SELECT u.id_usuario, u.nombre, u.correo, u.contrasena, r.nombre_rol 
-       FROM Usuario u
-       INNER JOIN Rol r ON u.id_rol = r.id_rol
-       WHERE u.correo = $1 AND r.nombre_rol = 'administrador'`,
-      [correo]
+      `SELECT u.id_user, u.name, u.email, u.password, r.name AS role_name
+       FROM Users u
+       INNER JOIN Role r ON u.id_role = r.id
+       WHERE u.email = $1 AND r.name = 'Administrador'`,
+      [email]
     );
 
     if (result.rows.length === 0) {
-      return NextResponse.json({ error: 'Usuario no encontrado o no es administrador' }, { status: 401 });
+      return NextResponse.json({ error: 'User not found or not an administrator' }, { status: 401 });
     }
 
-    const usuario = result.rows[0];
+    const user = result.rows[0];
 
-    // Verificar contraseña
-    const match = await bcrypt.compare(contrasena, usuario.contrasena);
+    // 2. Validate password (hashed with bcrypt)
+    const match = await bcrypt.compare(password, user.password);
     if (!match) {
-      return NextResponse.json({ error: 'Contraseña incorrecta' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // Generar token JWT
+    // 3. Generate JWT token
     const token = jwt.sign(
-      { id_usuario: usuario.id_usuario, nombre: usuario.nombre, correo: usuario.correo, rol: usuario.nombre_rol },
+      { id_user: user.id_user, name: user.name, email: user.email, role: user.role_name },
       SECRET_KEY,
       { expiresIn: '8h' }
     );
 
-    return NextResponse.json({ token, usuario: { id: usuario.id_usuario, nombre: usuario.nombre, correo: usuario.correo } }, { status: 200 });
+    // 4. Return token & user payload (omit password)
+    return NextResponse.json(
+      {
+        token,
+        user: {
+          id: user.id_user,
+          name: user.name,
+          email: user.email,
+          role: user.role_name,
+        },
+      },
+      { status: 200 }
+    );
   } catch (error) {
-    return NextResponse.json({ error: 'Error en el login' }, { status: 500 });
+    console.error('Login error:', error);
+    return NextResponse.json({ error: 'Login error' }, { status: 500 });
   }
 }

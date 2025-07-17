@@ -1,4 +1,9 @@
+import dotenv from 'dotenv';
 import { Pool } from 'pg';
+
+// Load environment variables (.env.local for dev, fallback to .env)
+dotenv.config({ path: process.env.NODE_ENV === 'production' ? '.env' : '.env.local' });
+// After dotenv config, process.env contains DB_* variables
 
 // Configuración de la conexión a PostgreSQL
 const pool = new Pool({

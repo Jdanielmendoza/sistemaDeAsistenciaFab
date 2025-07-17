@@ -23,9 +23,14 @@ export default function ProfileForm() {
   const getUniversities = async () => {
     try {
       setIsLoading(true)
-      const result = await fetch("http://localhost:3000/api/university")
+      const result = await fetch("/api/university")
       const data = await result.json()
-      setUniversities(data)
+      if (Array.isArray(data)) {
+        setUniversities(data)
+      } else {
+        console.warn("Respuesta de /api/university no es un array", data)
+        setUniversities([])
+      }
       return data
     } catch (error) {
       console.log(error)
@@ -37,7 +42,7 @@ export default function ProfileForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-        const response = await fetch("http://localhost:3000/api/users", {
+        const response = await fetch("/api/users", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -47,8 +52,8 @@ export default function ProfileForm() {
                 email: values.email,
                 birthdate: values.birthdate.toISOString().split("T")[0],
                 password: values.password,
-                phone_number: values.phone_number.toString(),
-                id_university: values.id_university || null,
+                phone_number: values.phone_number?.toString() || null,
+                id_university: !values.id_university || values.id_university === 'none' ? null : values.id_university,
                 id_role: values.id_role,
             }),
         });
@@ -204,17 +209,21 @@ export default function ProfileForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="ninguna">Ninguna</SelectItem>
+                        <SelectItem value="none">Ninguna</SelectItem>
                         {isLoading ? (
                           <SelectItem value="loading" disabled>
                             Cargando universidades...
                           </SelectItem>
-                        ) : (
+                        ) : universities.length > 0 ? (
                           universities.map((university) => (
                             <SelectItem key={university.id} value={university.id}>
                               {university.name}
                             </SelectItem>
                           ))
+                        ) : (
+                          <SelectItem value="none" disabled>
+                            Sin universidades
+                          </SelectItem>
                         )}
                       </SelectContent>
                     </Select>

@@ -26,20 +26,24 @@ export function LoginForm({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ correo: email, contrasena: password }),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Si el login es exitoso, redirigir al dashboard
+        // Guardar token & user en localStorage (puedes cambiar a cookies si lo prefieres)
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+
+        // Redirigir al dashboard
         router.push("/dashboard");
       } else {
-        // Si hay un error, mostrarlo al usuario
-        setError(data.error || "Error en el login");
+        // Mostrar error
+        setError(data.error || "Login error");
       }
     } catch (err) {
-      setError("Error en la conexión con el servidor");
+      setError("Server connection error");
     }
   };
 

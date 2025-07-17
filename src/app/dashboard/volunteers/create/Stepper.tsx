@@ -1,7 +1,7 @@
 'use client'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ProfileForm from "./Form"
-import { createContext, useState } from "react"
+import { createContext, useState, useEffect } from "react"
 import FormRFIDCard from "./FormRFIDCard";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -19,14 +19,32 @@ const Stepper = () => {
     const userForm = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-      //      id_user: "",
             name: "",
             email: "",
             birthdate: new Date("2000-08-21"),
             password: "",
-            id_role: "b72ae401-6234-4039-978b-a089f81d7e05",
+            id_role: "", // se rellena al montar
         },
     })
+
+    // Asignar UUID real del rol 'Voluntario' al cargar el componente
+    useEffect(() => {
+        const fetchRole = async () => {
+            try {
+                const res = await fetch('/api/roles');
+                if (res.ok) {
+                    const roles = await res.json();
+                    const volunteer = roles.find((r:any)=> r.name?.toLowerCase() === 'voluntario');
+                    if (volunteer) {
+                        userForm.setValue('id_role', volunteer.id, { shouldValidate: true });
+                    }
+                }
+            } catch (e) {
+                console.error('No se pudo obtener roles', e);
+            }
+        };
+        fetchRole();
+    }, []);
     return (
         <ContextSelectedTab.Provider value={{ tabSelected, setTabSelected, userForm }} >
             <Tabs value={tabSelected} className="w-full">

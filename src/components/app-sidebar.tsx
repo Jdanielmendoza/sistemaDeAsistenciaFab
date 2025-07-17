@@ -13,12 +13,13 @@ import {
   Settings2,
   SquareTerminal,
   Home,
+  Users,
+  Clock,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
 import { NavProjects } from "@/components/nav-projects"
 import { NavUser } from "@/components/nav-user"
-import { TeamSwitcher } from "@/components/team-switcher"
 import {
   Sidebar,
   SidebarContent,
@@ -27,73 +28,74 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
+import { useEffect, useState } from "react";
+
+function DynamicNavUser() {
+  const [user, setUser] = useState(placeholderUser);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('user');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setUser({
+            name: parsed.name ?? placeholderUser.name,
+            email: parsed.email ?? placeholderUser.email,
+            avatar: "/avatars/shadcn.jpg",
+          });
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, []);
+
+  return <NavUser user={user} />;
+}
+
+const placeholderUser = {
+  name: "Usuario",
+  email: "usuario@example.com",
+  avatar: "/avatars/shadcn.jpg",
+};
+
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  teams: [
-    {
-      name: "Acme Inc",
-      logo: GalleryVerticalEnd,
-      plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
-    },
-  ],
+  teams: [],
   navMain: [
     {
       title: "Dashboard",
-      url: "/",
+      url: "#",
       icon: Home,
-      isActive: true,
       items: [
-        {
-          title: "Inicio",
-          url: "/dashboard",
-        },
-        {
-          title: "Estadísticas",
-          url: "/dashboard/estadisticas",
-        }
+        { title: "Inicio", url: "/dashboard" },
+        { title: "Estadísticas", url: "/dashboard/estadisticas" },
       ],
     },
     {
-      title: "Gestión de Usuarios",
+      title: "Usuarios",
       url: "#",
-      icon: Bot,
+      icon: Users,
       items: [
-        {
-          title: "Administradores",
-          url: "/dashboard/admin",
-        },
-        {
-          title: "Voluntarios",
-          url: "/dashboard/volunteers",
-        },
+        { title: "Administradores", url: "/dashboard/admin" },
+        { title: "Voluntarios", url: "/dashboard/volunteers" },
       ],
     },
     {
-      title: "Registros de Asistencia",
+      title: "Asistencia",
       url: "#",
-      icon: BookOpen,
+      icon: Clock,
       items: [
+        { title: "Entradas/Salidas", url: "/dashboard/attendance-record" },
+        { title: "Presentes ahora", url: "/dashboard/attendance-live" },
         {
-          title: "Ver Registros",
-          url: "/dashboard/attendance-record",
-        },
-        {
-          title: "Reportes Diarios",
-          url: "/dashboard/attendance-reports",
+          title: "Reportes",
+          url: "#",
+          items: [
+            { title: "Diario", url: "/dashboard/attendance-reports/diario" },
+            { title: "Semanal", url: "/dashboard/attendance-reports/semanal" },
+            { title: "Mensual", url: "/dashboard/attendance-reports/mensual" },
+          ],
         },
       ],
     },
@@ -102,18 +104,8 @@ const data = {
       url: "#",
       icon: Settings2,
       items: [
-        {
-          title: "Roles y Permisos",
-          url: "/dashboard/roles",
-        },
-        {
-          title: "Tarjetas RFID",
-          url: "/dashboard/rfidCards",
-        },
-        {
-          title: "Universidades",
-          url: "/dashboard/universidades",
-        },
+        { title: "Horarios", url: "/dashboard/horarios" },
+        { title: "Universidades", url: "/dashboard/universidades" },
       ],
     },
   ],
@@ -139,15 +131,13 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
-      </SidebarHeader>
+      <SidebarHeader />
       <SidebarContent>
         <NavMain items={data.navMain} />
         {/* <NavProjects projects={data.projects} /> */}
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <DynamicNavUser />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

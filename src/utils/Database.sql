@@ -86,3 +86,16 @@ WHERE id_role = Role.id AND id_university = University.id
 INSERT INTO Role (name) VALUES
     ('Voluntario'),
     ('Administrador');
+
+
+INSERT INTO University (name) VALUES
+  ('UNIFRANZ'),
+  ('Universidad Autónoma Gabriel René Moreno'),
+  ('Univalle'),
+  ('Universidad Nur'),
+  ('UTEPSA'),
+  ('UPSA'),
+  ('Universidad Privada Domingo Savio'),
+  ('Universidad de Aquino Bolivia'),
+  ('Universidad Católica Boliviana'),
+  ('Universidad de la Cordillera');

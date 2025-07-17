@@ -10,7 +10,12 @@ export default {
   theme: {
   	extend: {
   		colors: {
-  			background: 'hsl(var(--background))',
+        brand: {
+          purple: 'hsl(var(--brand-purple))',
+          indigo: 'hsl(var(--brand-indigo))',
+          teal: 'hsl(var(--brand-teal))',
+        },
+        background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {
   				DEFAULT: 'hsl(var(--card))',

@@ -174,7 +174,7 @@ function DeleteConfirmation({
                     <AlertDialogAction onClick={async () => {
                         console.log("Eliminar usuario...");
                         try {
-                            const response = await fetch("http://localhost:3000/api/users", {
+                            const response = await fetch("/api/users", {
                                 method: "DELETE",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ id_user: volunteerSelected.id_user }),
@@ -237,7 +237,7 @@ function DataTableDemo() {
     const fetchVolunteers = async () => {
         try {
             setIsloading(true);
-            const result = await fetch("http://localhost:3000/api/users");
+            const result = await fetch("/api/users?role=voluntario");
             const data = await result.json();
             setVolunteers(data);
         } catch (error) {

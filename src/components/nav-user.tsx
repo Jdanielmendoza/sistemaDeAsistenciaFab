@@ -103,9 +103,17 @@ export function NavUser({
               </DropdownMenuItem> */}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('user');
+                }
+                window.location.href = '/login';
+              }}
+            >
               <LogOut />
-              <Link href="/login" >Cerrar Sesión</Link>
+              <span>Cerrar Sesión</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

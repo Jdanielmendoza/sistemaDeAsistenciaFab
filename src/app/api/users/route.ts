@@ -2,10 +2,34 @@ import { NextResponse } from "next/server";
 import { query } from "@/utils/db";
 import bcrypt from "bcryptjs";
 import { queries } from "@/utils/queries";
+import type { NextRequest } from "next/server";
 
 // GET: Obtener todos los usuarios
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const roleParam = req.nextUrl.searchParams.get("role");
+
+    if (roleParam) {
+      // Sanitizar: solo letras y espacios
+      const roleFiltered = roleParam.trim().toLowerCase();
+      const result = await query(
+        `SELECT u.id_user,
+                u.name AS user_name,
+                u.email,
+                u.birthdate,
+                u.phone_number,
+                r.name AS role_name,
+                COALESCE(uni.name, '') AS university_name
+         FROM Users u
+         JOIN Role r ON u.id_role = r.id
+         LEFT JOIN University uni ON u.id_university = uni.id
+         WHERE LOWER(r.name) = $1`,
+        [roleFiltered]
+      );
+      return NextResponse.json(result.rows, { status: 200 });
+    }
+
+    // Sin filtro devuelve todos
     const result = await query(queries.users.getAllUsers);
     return NextResponse.json(result?.rows, { status: 200 });
   } catch (error) {

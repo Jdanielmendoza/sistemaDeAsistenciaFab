@@ -74,15 +74,15 @@ export function ScheduleForm() {
       day_of_week: Number.parseInt(day),
       start_time: timesByDay[day].startTime,
       end_time: timesByDay[day].endTime,
-      start_date: startDate,
-      end_date: endDate,
+      start_date: startDate ? startDate.toISOString().split("T")[0] : null,
+      end_date: endDate ? endDate.toISOString().split("T")[0] : null,
     }))
 
     console.log("Schedule data:", scheduleData)
     const saveSchedule = async () => {
       try {
         setIsLoading(true); 
-        const response = await fetch("http://localhost:3000/api/schedule", {
+        const response = await fetch("/api/schedule", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

@@ -13,12 +13,7 @@ import {
 import Link from 'next/link';
 
 
-function sleep(ms : number = 0):Promise<unknown>{
-  return new Promise((resolve)=> setTimeout(resolve, ms));
-}
-
 const admin = async() => {
-  await sleep(3000);
   return (
     <div>
       <section className='w-full mt-10 mb-5 flex justify-between' >
