@@ -38,20 +38,20 @@ export async function POST(req: NextRequest) {
 SELECT id_user FROM Card WHERE name = $1
 `;
     const userResult = await query(userQuery, [rfid]);
-
+    console.log(userResult);
     if (userResult.rows.length === 0) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const userId = userResult.rows[0].id_user;
-
+    console.log(userId);
     // Verificar si ya existe un registro de entrada sin salida
     const attendanceQuery = `
 SELECT * FROM AttendanceRecord
 WHERE id_user = $1 AND check_out_time IS NULL
 `;
     const attendanceResult = await query(attendanceQuery, [userId]);
-
+    console.log("attendanceResult",attendanceResult);
     if (attendanceResult.rows.length === 0) {
       // Registrar entrada
       const insertQuery = `
@@ -61,10 +61,13 @@ WHERE id_user = $1 AND check_out_time IS NULL
 `;
 //validar tiempo de respuesta de entrada y salida .......
       const insertResult = await query(insertQuery, [userId]);
-      return NextResponse.json({
-        message: "Check-in registered",
-        record: insertResult.rows[0],
-      });
+      return NextResponse.json(
+        {
+          message: "Check-in registered",
+          record: insertResult.rows[0],
+        },
+        { status: 201 }
+      );
     } else {
       // Registrar salida
       const recordId = attendanceResult.rows[0].id_record;
@@ -78,11 +81,14 @@ WHERE id_user = $1 AND check_out_time IS NULL
   RETURNING *
 `;
       const updateResult = await query(updateQuery, [recordId]);
-
-      return NextResponse.json({
-        message: "Check-out registered",
-        record: updateResult.rows[0],
-      });
+      console.log("updateResult",updateResult);
+      return NextResponse.json(
+        {
+          message: "Check-out registered",
+          record: updateResult.rows[0],
+        },
+        { status: 200 }
+      );
     }
   } catch (error) {
     console.error("Error handling attendance record:", error);

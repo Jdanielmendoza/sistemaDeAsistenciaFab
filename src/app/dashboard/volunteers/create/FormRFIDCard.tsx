@@ -2,7 +2,7 @@
 
 import { Card } from '@/components/ui/card';
 import Image from 'next/image';
-import styled from 'styled-components';
+import LanyardWrapper from '@/components/LanyardWrapper';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ContextSelectedTab, StepperSelected } from './Stepper';
-import { useContext, useState } from 'react';
+import { useContext, useState, useEffect } from 'react';
 
 const formSchema = z.object({
     cardNumber: z.string().min(5, {
@@ -29,6 +29,11 @@ const formSchema = z.object({
 const FormRFIDCard = () => {
     const { setTabSelected, userForm } = useContext(ContextSelectedTab);
     const [isLoading,setIsLoading] = useState(false); 
+    const [cardData, setCardData] = useState({
+        name: "daniel",
+        cardNumber: "123456",
+        logo: "/logoFablab.png"
+    });
     const formCard = useForm({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -37,9 +42,22 @@ const FormRFIDCard = () => {
         },
     });
 
+    // Watch form changes to update card preview
+    const watchedCardNumber = formCard.watch('cardNumber');
+    const userName = userForm.getValues('name');
+
+    useEffect(() => {
+        setCardData({
+            name: userName || "NOMBRE DEL VOLUNTARIO",
+            cardNumber: watchedCardNumber || "•••• •••• •••• ••••",
+            logo: "/logoFablab.png"
+        });
+    }, [watchedCardNumber, userName]);
+
     const onSubmit =async (values: any) => {
          try {
-                console.log(values?.id_user);
+                console.log("Form values:", values);
+                console.log("User form values:", userForm.getValues());
                 setIsLoading(true); 
                 const response = await fetch("/api/cards", {
                     method: "POST",
@@ -51,107 +69,101 @@ const FormRFIDCard = () => {
                         id_user:values?.id_user
                     }),
                 });
+               
+               console.log("API Response status:", response.status);
+               
                 if (!response.ok) {
-                    console.log(response);
-                    throw new Error("Error al registrar el tarjeta");
+                   const errorData = await response.json().catch(() => response.text());
+                   console.error("API Error Response:", errorData);
+                   console.error("Status:", response.status, response.statusText);
+                   const errorMessage = typeof errorData === 'object' && errorData.error 
+                        ? errorData.error 
+                        : errorData;
+                   throw new Error(`Error al registrar la tarjeta (${response.status}): ${errorMessage}`);
                 }
                 const data = await response.json();
                 console.log("tarjeta registrada exitosamente:", data);
+                setTabSelected(StepperSelected.Schedule);
             } catch (error) {
                 console.error("Error:", error);
+                // Show user-friendly error message
+                alert(`Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
             } finally {
                 setIsLoading(false);
-                console.log("next step");
-                setTabSelected(StepperSelected.Schedule); 
             }
     };
 
     return (
-        <Form {...formCard}>
-            <form onSubmit={formCard.handleSubmit(onSubmit)} className="space-y-4 w-full max-w-md">
-                <Card className='w-full max-w-md min-h-48 p-4'>
-                    <StyledWrapper>
-                        <div className="visa-card">
-                            <div className="logoContainer">
-                                <Image src="/logoFablab.png" alt="logo Fablab" width={100} height={50} />
-                            </div>
+        <div className="w-full max-w-7xl mx-auto space-y-6">
+            {/* Header */}
+            <div className="text-center space-y-2">
+                <h2 className="text-2xl font-bold">Asignación de Tarjeta RFID</h2>
+                <p className="text-muted-foreground">
+                    Configura la tarjeta que será asignada a {userName || "este voluntario"}
+                </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-8 items-center">
+                {/* Left: Form */}
+                <div className="space-y-6">
+                    <Form {...formCard}>
+                        <form onSubmit={formCard.handleSubmit(onSubmit)} className="space-y-4">
                             <FormField
                                 control={formCard.control}
                                 name="cardNumber"
                                 render={({ field }) => (
-                                    <FormItem className="number-container">
-                                        <FormLabel className="input-label">Número de tarjeta</FormLabel>
+                                    <FormItem>
+                                        <FormLabel>Número de Tarjeta RFID</FormLabel>
                                         <FormControl>
-                                            <Input className="inputstyle pt-4 pb-4" placeholder="XXXXXXXXXXX" {...field} autoFocus autoComplete='false' />
+                                            <Input 
+                                                className="text-lg h-12" 
+                                                placeholder="Ingresa el número de tarjeta" 
+                                                {...field} 
+                                                autoFocus 
+                                                autoComplete='false' 
+                                            />
                                         </FormControl>
                                         <FormMessage />
+                                        <p className="text-sm text-muted-foreground">
+                                            Este número identifica únicamente la tarjeta RFID
+                                        </p>
                                     </FormItem>
                                 )}
                             />
-                            <div className="name-wrapper">
-                                <label className="input-label" htmlFor="holderName">Voluntario</label>
-                                <input className="inputstyle  " id="holderName" placeholder="nombre" type="text" autoComplete='off' disabled value={userForm.getValues('name')} />
+
+                            <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                                <h4 className="font-medium">Información del Voluntario</h4>
+                                <div className="text-sm space-y-1">
+                                    <div><span className="font-medium">Nombre:</span> {userName || "No especificado"}</div>
+                                    <div><span className="font-medium">ID:</span> {userForm.getValues('id_user')}</div>
+                                </div>
                             </div>
-                        </div>
-                    </StyledWrapper>
-                </Card>
-                <Button type="submit" disabled={isLoading} className="w-full">Enviar</Button>
-            </form>
-        </Form>
+
+                            <Button 
+                                type="submit" 
+                                disabled={isLoading} 
+                                className="w-full h-12 text-lg"
+                                size="lg"
+                            >
+                                {isLoading ? "Asignando..." : "Asignar Tarjeta"}
+                            </Button>
+                        </form>
+                    </Form>
+                </div>
+
+                {/* Right: 3D Card Preview */}
+                <div className="h-[600px] flex items-center justify-center">
+                    <LanyardWrapper 
+                        cardData={cardData}
+                        className="w-full h-full"
+                        use3D={true}
+                        rotationSpeed={0.3}
+                        rotationAxis="y"
+                    />
+                </div>
+            </div>
+        </div>
     );
 }
-
-const StyledWrapper = styled.div`
-  .visa-card {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-end;
-    width: 100%;
-    max-width: 450px;
-    height: 280px;
-    background: linear-gradient(44deg, #373cf5 0%, #ffffff 85%);
-    border-radius: 10px;
-    padding: 30px;
-    font-family: Arial, Helvetica, sans-serif;
-    position: relative;
-    gap: 15px;
-  }
-  .logoContainer {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    height: fit-content;
-    position: absolute;
-    top: 0;
-    left: 0;
-    padding: 18px;
-  }
-  .inputstyle {
-    background-color: transparent;
-    border: none;
-    outline: none;
-    color: white;
-    caret-color: red;
-    font-size: 24px;
-    height: 24px;
-    letter-spacing: 3px;
-  }
-  .number-container, .name-wrapper {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-  }
-  .input-label {
-    font-size: 12px;
-    letter-spacing: 1.5px;
-    color: #e2e2e2;
-  }
-  #holderName {
-    font-size: 16px;
-    width: 100%;
-  }
-`;
 
 export default FormRFIDCard;
