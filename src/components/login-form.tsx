@@ -4,14 +4,12 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useRouter } from "next/navigation"; // Para redirigir al usuario
 import { useState } from "react"; // Para manejar el estado del formulario
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"form">) {
-  const router = useRouter(); // Hook para redirigir
   const [email, setEmail] = useState(""); // Estado para el email
   const [password, setPassword] = useState(""); // Estado para la contraseña
   const [error, setError] = useState(""); // Estado para manejar errores
@@ -23,6 +21,7 @@ export function LoginForm({
       // Enviar datos a la API de login
       const response = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -32,12 +31,14 @@ export function LoginForm({
       const data = await response.json();
 
       if (response.ok) {
-        // Guardar token & user en localStorage (puedes cambiar a cookies si lo prefieres)
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
+        // Guardar token & user en localStorage (opcional para UX)
+        try {
+          localStorage.setItem("token", data.token);
+          localStorage.setItem("user", JSON.stringify(data.user));
+        } catch {}
 
-        // Redirigir al dashboard
-        router.push("/dashboard");
+        // Forzar navegación de nivel superior para asegurar envío de cookie
+        window.location.replace("/dashboard");
       } else {
         // Mostrar error
         setError(data.error || "Login error");

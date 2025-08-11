@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/utils/db';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { SignJWT } from 'jose';
+import { JWT_SECRET_STRING } from '@/lib/env';
 
-const SECRET_KEY = process.env.JWT_SECRET || 'supersecretkey';
+const SECRET_KEY = new TextEncoder().encode(JWT_SECRET_STRING);
 
 /**
  * Login endpoint
@@ -35,15 +36,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // 3. Generate JWT token
-    const token = jwt.sign(
-      { id_user: user.id_user, name: user.name, email: user.email, role: user.role_name },
-      SECRET_KEY,
-      { expiresIn: '8h' }
-    );
+    // 3. Generate JWT token using jose
+    const token = await new SignJWT({
+      id_user: user.id_user,
+      name: user.name,
+      email: user.email,
+      role: user.role_name,
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('8h')
+      .sign(SECRET_KEY);
 
-    // 4. Return token & user payload (omit password)
-    return NextResponse.json(
+    // 4. Set httpOnly cookie and return token & user payload (omit password)
+    const response = NextResponse.json(
       {
         token,
         user: {
@@ -55,6 +61,16 @@ export async function POST(req: Request) {
       },
       { status: 200 }
     );
+
+    response.cookies.set('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 8, // 8 hours
+    });
+
+    return response;
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json({ error: 'Login error' }, { status: 500 });
