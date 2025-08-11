@@ -1,38 +1,66 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import jwt from 'jsonwebtoken';
+import { jwtVerify, type JWTPayload } from 'jose';
+import { JWT_SECRET_STRING } from '@/lib/env';
 
-const SECRET_KEY = process.env.JWT_SECRET || 'supersecretkey';
+const SECRET_KEY = new TextEncoder().encode(JWT_SECRET_STRING);
 
-// Rutas protegidas
-const protectedRoutes = ['/api/volunteers', '/api/registrations'];
-
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-
-  // Si la ruta no es protegida, continuar sin validar el token
-  if (!protectedRoutes.some((route) => pathname.startsWith(route))) {
-    return NextResponse.next();
-  }
-
-  // Obtener el token del header Authorization
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Acceso no autorizado' }, { status: 401 });
-  }
-
-  const token = authHeader.split(' ')[1];
-
+async function verifyJwt(token: string): Promise<JWTPayload | null> {
   try {
-    const decoded = jwt.verify(token, SECRET_KEY);
-    req.headers.set('user', JSON.stringify(decoded)); 
-    return NextResponse.next();
-  } catch (error) {
-    return NextResponse.json({ error: 'Token inválido o expirado' }, { status: 403 });
+    const { payload } = await jwtVerify(token, SECRET_KEY);
+    return payload;
+  } catch {
+    return null;
   }
 }
 
-// Aplicar middleware solo en API routes
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  const token = req.cookies.get('token')?.value;
+  const decodedUser = token ? await verifyJwt(token) : null;
+  const isAuthenticated = Boolean(decodedUser);
+
+  // Server-side redirects for app routes
+  const isDashboard = pathname.startsWith('/dashboard');
+  const isLogin = pathname === '/login';
+  const isRoot = pathname === '/';
+
+  if (isDashboard && !isAuthenticated) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/login';
+    return NextResponse.redirect(url);
+  }
+
+  if ((isLogin || isRoot) && isAuthenticated) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/dashboard';
+    return NextResponse.redirect(url);
+  }
+
+  if (isRoot && !isAuthenticated) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/login';
+    return NextResponse.redirect(url);
+  }
+
+  // For API routes, attach decoded user to request headers if available
+  if (pathname.startsWith('/api')) {
+    const requestHeaders = new Headers(req.headers);
+    if (decodedUser) {
+      requestHeaders.set('user', JSON.stringify(decodedUser));
+    }
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
+
+  return NextResponse.next();
+}
+
 export const config = {
-  matcher: ['/api/:path*'],
+  matcher: [
+    '/api/:path*',
+    '/',
+    '/login',
+    '/dashboard/:path*',
+  ],
 };

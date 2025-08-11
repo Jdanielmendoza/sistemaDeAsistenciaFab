@@ -1,15 +1,22 @@
-import { AppSidebar } from "@/components/app-sidebar"
-import { Separator } from "@/components/ui/separator"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { ReactNode } from "react"
-import { DynamicBreadcrumb } from "@/components/dynamic-breadcrumb"
-import { ThemeToggle } from "@/components/theme-toggle"
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { verifyToken } from "@/lib/auth";
+import { AppSidebar } from "@/components/app-sidebar";
+import { Separator } from "@/components/ui/separator";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { ReactNode } from "react";
+import { DynamicBreadcrumb } from "@/components/dynamic-breadcrumb";
+import { ThemeToggle } from "@/components/theme-toggle";
 
-export default function Page({ children }: { children: ReactNode }) {
+export default async function Page({ children }: { children: ReactNode }) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+  const payload = token ? await verifyToken(token) : null;
+
+  if (!payload) {
+    redirect("/login");
+  }
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -25,5 +32,5 @@ export default function Page({ children }: { children: ReactNode }) {
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">{children}</div>
       </SidebarInset>
     </SidebarProvider>
-  )
+  );
 }

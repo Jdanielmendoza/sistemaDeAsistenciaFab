@@ -42,6 +42,19 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar()
 
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {}
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      } catch {}
+      window.location.replace('/login');
+    }
+  }
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -103,15 +116,7 @@ export function NavUser({
               </DropdownMenuItem> */}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  localStorage.removeItem('token');
-                  localStorage.removeItem('user');
-                }
-                window.location.href = '/login';
-              }}
-            >
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOut />
               <span>Cerrar Sesión</span>
             </DropdownMenuItem>
