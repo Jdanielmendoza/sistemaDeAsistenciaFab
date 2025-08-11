@@ -62,9 +62,13 @@ export async function POST(req: Request) {
       { status: 200 }
     );
 
+    // Determine if the request is HTTPS (behind proxy or direct)
+    const url = new URL(req.url);
+    const isHttps = req.headers.get('x-forwarded-proto') === 'https' || url.protocol === 'https:';
+
     response.cookies.set('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isHttps,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 8, // 8 hours
