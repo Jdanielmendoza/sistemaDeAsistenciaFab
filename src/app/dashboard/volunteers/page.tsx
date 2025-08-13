@@ -137,7 +137,9 @@ const createColumns = (setOpen: React.Dispatch<React.SetStateAction<boolean>>, S
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem><EyeIcon /> <Link href={"volunteers/" + Volunteer.id_user}>Ver perfil</Link> </DropdownMenuItem>
-                        <DropdownMenuItem><EditIcon /> Editar perfil</DropdownMenuItem>
+                        <DropdownMenuItem>
+                            <EditIcon /> <Link href={"volunteers/" + Volunteer.id_user}>Editar perfil</Link>
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setOpen(true); console.log(Volunteer.id_user); SetVolunteerSelected(Volunteer) }}>
                             <TrashIcon /> Eliminar
