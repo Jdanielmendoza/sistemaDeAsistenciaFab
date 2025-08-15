@@ -1,21 +1,7 @@
 "use client"
 
 import * as React from "react"
-import {
-  AudioWaveform,
-  BookOpen,
-  Bot,
-  Command,
-  Frame,
-  GalleryVerticalEnd,
-  Map,
-  PieChart,
-  Settings2,
-  SquareTerminal,
-  Home,
-  Users,
-  Clock,
-} from "lucide-react"
+import { Home, Users, Clock, Settings2, IdCard, GraduationCap, UserPlus, CalendarCheck, BarChart2 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
 import { NavProjects } from "@/components/nav-projects"
@@ -68,17 +54,17 @@ const data = {
       url: "#",
       icon: Home,
       items: [
-        { title: "Inicio", url: "/dashboard" },
-        { title: "Estadísticas", url: "/dashboard/estadisticas" },
+        { title: "Inicio", url: "/dashboard", icon: BarChart2 },
       ],
     },
     {
-      title: "Usuarios",
+      title: "Voluntarios",
       url: "#",
       icon: Users,
       items: [
-        { title: "Administradores", url: "/dashboard/admin" },
-        { title: "Voluntarios", url: "/dashboard/volunteers" },
+        { title: "Listado", url: "/dashboard/volunteers", icon: Users },
+        { title: "Agregar", url: "/dashboard/volunteers/create", icon: UserPlus },
+        { title: "Tarjetas RFID", url: "/dashboard/rfidCards", icon: IdCard },
       ],
     },
     {
@@ -86,17 +72,8 @@ const data = {
       url: "#",
       icon: Clock,
       items: [
-        { title: "Entradas/Salidas", url: "/dashboard/attendance-record" },
-        { title: "Presentes ahora", url: "/dashboard/attendance-live" },
-        {
-          title: "Reportes",
-          url: "#",
-          items: [
-            { title: "Diario", url: "/dashboard/attendance-reports/diario" },
-            { title: "Semanal", url: "/dashboard/attendance-reports/semanal" },
-            { title: "Mensual", url: "/dashboard/attendance-reports/mensual" },
-          ],
-        },
+        { title: "Registros", url: "/dashboard/attendance-record", icon: CalendarCheck },
+        { title: "Estadísticas", url: "/dashboard/attendance-stats", icon: BarChart2 },
       ],
     },
     {
@@ -104,8 +81,8 @@ const data = {
       url: "#",
       icon: Settings2,
       items: [
-        { title: "Horarios", url: "/dashboard/horarios" },
-        { title: "Universidades", url: "/dashboard/universidades" },
+        { title: "Horarios", url: "/dashboard/horarios", icon: Clock },
+        { title: "Universidades", url: "/dashboard/universidades", icon: GraduationCap },
       ],
     },
   ],

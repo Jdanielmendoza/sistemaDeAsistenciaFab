@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   CalendarIcon,
   Download,
@@ -114,15 +114,26 @@ export function VolunteerAttendanceTable() {
   const [selectedRecord, setSelectedRecord] = useState<any>(null)
 
   const [records, setRecords] = useState<AttendanceRecordItem[]>([]);
+  const [page, setPage] = useState<number>(1)
+  const [pageSize] = useState<number>(10)
+  const [total, setTotal] = useState<number>(0)
 
   useEffect(() => {
     const fetchRecords = async () => {
       setLoading(true)
       try {
-        const res = await fetch("/api/attendance_record");
+        const qs = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+          search: searchTerm,
+          onlyPresent: String(onlyPresent),
+          ...(range && range.from && range.to ? { from: range.from.toISOString().slice(0,10), to: range.to.toISOString().slice(0,10) } : {}),
+        })
+        const res = await fetch(`/api/attendance_record?${qs.toString()}`);
         if (!res.ok) throw new Error("Failed to load attendance records");
         const data = await res.json();
         setRecords(data.records || []);
+        setTotal(data.total || 0)
       } catch (err) {
         console.error(err);
       } finally {
@@ -131,7 +142,7 @@ export function VolunteerAttendanceTable() {
     };
 
     fetchRecords();
-  }, []);
+  }, [page, pageSize, searchTerm, range, onlyPresent]);
 
   // Quick range handler
   const applyQuickRange = (value: string | null) => {
@@ -150,21 +161,10 @@ export function VolunteerAttendanceTable() {
     }
   }
 
-  // Filtrar registros basados en búsqueda y fecha
-  const filteredRecords = records.filter((record) => {
-    const matchesSearch = record.name.toLowerCase().includes(searchTerm.toLowerCase())
+  // server-side already filters; keep client list as-is
+  const filteredRecords = records
 
-    const recordDate = new Date(record.check_in_time)
-
-    let matchesDate = true
-    if (range && range.from && range.to) {
-      matchesDate = recordDate >= range.from && recordDate <= addDays(range.to,1) // inclusive
-    }
-
-    const matchesPresent = !onlyPresent || record.check_out_time === null
-
-    return matchesSearch && matchesDate && matchesPresent
-  })
+  const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize))
 
   const handleEdit = (record: any) => {
     setSelectedRecord(record)
@@ -295,11 +295,11 @@ export function VolunteerAttendanceTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Fecha / Hora de Entrada</TableHead>
-              <TableHead>Fecha / Hora de Salida</TableHead>
-              <TableHead>Nombre del Voluntario</TableHead>
-              <TableHead>Horas Totales</TableHead>
-              <TableHead>Horas Extras</TableHead>
+              <TableHead><div className="flex items-center gap-2"><CalendarIcon className="h-4 w-4"/> Entrada</div></TableHead>
+              <TableHead><div className="flex items-center gap-2"><Clock className="h-4 w-4"/> Salida</div></TableHead>
+              <TableHead><div className="flex items-center gap-2"><Search className="h-4 w-4"/> Voluntario</div></TableHead>
+              <TableHead><div className="flex items-center gap-2"><Clock className="h-4 w-4"/> Total</div></TableHead>
+              <TableHead><div className="flex items-center gap-2"><Clock className="h-4 w-4"/> Extras</div></TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -354,16 +354,15 @@ export function VolunteerAttendanceTable() {
       </div>
 
       <div className="flex items-center justify-end space-x-2 py-4">
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <Button variant="outline" size="sm">
-          1
-        </Button>
-        <Button variant="outline" size="sm">
-          2
-        </Button>
-        <Button variant="outline" size="sm">
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+          <Button key={p} variant={p === page ? "default" : "outline"} size="sm" onClick={() => setPage(p)}>
+            {p}
+          </Button>
+        ))}
+        <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>

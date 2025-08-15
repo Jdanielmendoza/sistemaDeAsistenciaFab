@@ -107,3 +107,33 @@ export async function POST(req:Request) {
         );
     }
 }
+
+export async function PUT(req: Request) {
+    try {
+        const { id, name } = await req.json();
+        if (!id || !name) {
+            return NextResponse.json({ error: "Campos requeridos: id y name" }, { status: 400 });
+        }
+
+        // Ensure card exists
+        const existing = await query("SELECT id FROM Card WHERE id = $1", [id]);
+        if (existing.rows.length === 0) {
+            return NextResponse.json({ error: "Tarjeta no encontrada" }, { status: 404 });
+        }
+
+        // Ensure name is unique across other cards
+        const dup = await query("SELECT id FROM Card WHERE name = $1 AND id <> $2", [name, id]);
+        if (dup.rows.length > 0) {
+            return NextResponse.json({ error: "Esta tarjeta ya está registrada" }, { status: 409 });
+        }
+
+        const updated = await query(
+            "UPDATE Card SET name = $1 WHERE id = $2 RETURNING *",
+            [name, id]
+        );
+
+        return NextResponse.json(updated.rows[0], { status: 200 });
+    } catch (error) {
+        return NextResponse.json({ error: "Error actualizando tarjeta" }, { status: 500 });
+    }
+}
