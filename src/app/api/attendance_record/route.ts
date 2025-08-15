@@ -1,19 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/utils/db";
 
-export async function GET() {
+// GET with server-side pagination and filters
+export async function GET(req: NextRequest) {
   try {
-    const attendanceQuery = `
+    const url = new URL(req.url);
+    const page = Math.max(1, Number(url.searchParams.get("page") || 1));
+    const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get("pageSize") || 10)));
+    const search = (url.searchParams.get("search") || "").trim().toLowerCase();
+    const from = url.searchParams.get("from"); // YYYY-MM-DD
+    const to = url.searchParams.get("to");     // YYYY-MM-DD
+    const onlyPresent = (url.searchParams.get("onlyPresent") || "false").toLowerCase() === "true";
+
+    const where: string[] = [];
+    const params: any[] = [];
+
+    if (search) {
+      params.push(`%${search}%`);
+      where.push(`LOWER(u.name) LIKE $${params.length}`);
+    }
+
+    if (from) {
+      params.push(from);
+      where.push(`(ar.check_in_time AT TIME ZONE 'America/La_Paz')::date >= $${params.length}`);
+    }
+    if (to) {
+      params.push(to);
+      where.push(`(ar.check_in_time AT TIME ZONE 'America/La_Paz')::date <= $${params.length}`);
+    }
+
+    if (onlyPresent) {
+      where.push(`ar.check_out_time IS NULL`);
+    }
+
+    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+    // Count total with same filters
+    const countSql = `
+      SELECT COUNT(*) AS total
+      FROM AttendanceRecord ar
+      JOIN Users u ON ar.id_user = u.id_user
+      ${whereSql}
+    `;
+    const countRes = await query(countSql, params);
+    const total = Number(countRes.rows?.[0]?.total || 0);
+
+    // Pagination
+    const offset = (page - 1) * pageSize;
+    const dataSql = `
       SELECT ar.id_record, ar.id_user, u.name, ar.check_in_time, ar.check_out_time, ar.total_hours
       FROM AttendanceRecord ar
       JOIN Users u ON ar.id_user = u.id_user
+      ${whereSql}
       ORDER BY ar.check_in_time DESC
+      OFFSET $${params.length + 1} LIMIT $${params.length + 2}
     `;
-    const attendanceResult = await query(attendanceQuery);
+    const dataRes = await query(dataSql, [...params, offset, pageSize]);
 
     return NextResponse.json({
-      message: "Attendance records retrieved successfully",
-      records: attendanceResult.rows,
+      records: dataRes.rows,
+      page,
+      pageSize,
+      total,
     });
   } catch (error) {
     console.error("Error retrieving attendance records:", error);

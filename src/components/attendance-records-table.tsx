@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   CalendarIcon,
   Download,
@@ -12,6 +12,9 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  User as UserIcon,
+  Timer,
+  AlarmClock,
 } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -137,6 +140,8 @@ export function AttendanceRecordsTable() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null)
+  const [page, setPage] = useState<number>(1)
+  const [pageSize] = useState<number>(10)
 
   // Filtrar registros basados en búsqueda y rango de fechas
   const filteredRecords = attendanceRecords.filter((record) => {
@@ -161,6 +166,14 @@ export function AttendanceRecordsTable() {
 
     return matchesSearch && matchesDate
   })
+
+  useEffect(() => { setPage(1) }, [searchTerm, dateRange])
+
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pageStart = (currentPage - 1) * pageSize
+  const pageEnd = pageStart + pageSize
+  const paginatedRecords = useMemo(() => filteredRecords.slice(pageStart, pageEnd), [filteredRecords, pageStart, pageEnd])
 
   const handleEdit = (record: AttendanceRecord) => {
     setSelectedRecord(record)
@@ -272,17 +285,17 @@ export function AttendanceRecordsTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Fecha y Hora de Entrada</TableHead>
-              <TableHead>Fecha y Hora de Salida</TableHead>
-              <TableHead>Nombre del Voluntario</TableHead>
-              <TableHead>Horas Totales</TableHead>
-              <TableHead>Horas Extras</TableHead>
+              <TableHead><div className="flex items-center gap-2"><CalendarIcon className="h-4 w-4"/> Entrada</div></TableHead>
+              <TableHead><div className="flex items-center gap-2"><Clock className="h-4 w-4"/> Salida</div></TableHead>
+              <TableHead><div className="flex items-center gap-2"><UserIcon className="h-4 w-4"/> Voluntario</div></TableHead>
+              <TableHead><div className="flex items-center gap-2"><Timer className="h-4 w-4"/> Total</div></TableHead>
+              <TableHead><div className="flex items-center gap-2"><AlarmClock className="h-4 w-4"/> Extras</div></TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredRecords.length > 0 ? (
-              filteredRecords.map((record) => (
+            {paginatedRecords.length > 0 ? (
+              paginatedRecords.map((record) => (
                 <TableRow key={record.id_record}>
                   <TableCell>{format(record.check_in_time, "dd/MM/yyyy HH:mm")}</TableCell>
                   <TableCell>
@@ -333,16 +346,15 @@ export function AttendanceRecordsTable() {
       </div>
 
       <div className="flex items-center justify-end space-x-2 py-4">
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <Button variant="outline" size="sm">
-          1
-        </Button>
-        <Button variant="outline" size="sm">
-          2
-        </Button>
-        <Button variant="outline" size="sm">
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+          <Button key={p} variant={p === currentPage ? "default" : "outline"} size="sm" onClick={() => setPage(p)}>
+            {p}
+          </Button>
+        ))}
+        <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>

@@ -97,7 +97,7 @@ export function SmoothLineChart({
             <stop offset="100%" stopColor="transparent" />
           </linearGradient>
           <filter id="lineGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="hsl(var(--primary) / 0.35)" flood-opacity="1" />
+            <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="hsl(var(--primary) / 0.35)" floodOpacity="1" />
           </filter>
         </defs>
         {/* grid */}
