@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/utils/db";
 
+const WEBHOOK_URL = process.env.N8N_ATTENDANCE_WEBHOOK_URL ;
+
+async function sendAttendanceWebhook(payload: any) {
+  try {
+    await fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.error("Failed to send webhook to n8n:", err);
+  }
+}
+
 // GET with server-side pagination and filters
 export async function GET(req: NextRequest) {
   try {
@@ -93,6 +107,25 @@ SELECT id_user FROM Card WHERE name = $1
 
     const userId = userResult.rows[0].id_user;
     console.log(userId);
+    // Obtener información extendida del usuario para el webhook
+    const userInfoQuery = `
+SELECT 
+  u.id_user,
+  u.name AS user_name,
+  u.email,
+  u.phone_number,
+  u.birthdate,
+  r.name AS role_name,
+  COALESCE(uni.name, '') AS university_name,
+  c.name AS card_rfid
+FROM Users u
+LEFT JOIN Role r ON u.id_role = r.id
+LEFT JOIN University uni ON u.id_university = uni.id
+LEFT JOIN Card c ON c.id_user = u.id_user
+WHERE u.id_user = $1
+`;
+    const userInfoRes = await query(userInfoQuery, [userId]);
+    const userInfo = userInfoRes.rows?.[0] || {};
     // Verificar si ya existe un registro de entrada sin salida
     const attendanceQuery = `
 SELECT * FROM AttendanceRecord
@@ -109,10 +142,37 @@ WHERE id_user = $1 AND check_out_time IS NULL
 `;
 //validar tiempo de respuesta de entrada y salida .......
       const insertResult = await query(insertQuery, [userId]);
+      const record = insertResult.rows[0];
+      // Enviar webhook (check-in)
+      const checkInTimeIso = record?.check_in_time ? new Date(record.check_in_time).toISOString() : null;
+      const checkInTimeLocal = record?.check_in_time ? new Date(record.check_in_time).toLocaleString("es-BO", { timeZone: "America/La_Paz" }) : null;
+      await sendAttendanceWebhook({
+        event: "check_in",
+        source: "attendance_api",
+        rfid,
+        user: {
+          id: userId,
+          name: userInfo.user_name,
+          email: userInfo.email,
+          phone_number: userInfo.phone_number,
+          birthdate: userInfo.birthdate,
+          role: userInfo.role_name,
+          university: userInfo.university_name,
+          card_rfid: userInfo.card_rfid || rfid,
+        },
+        record: {
+          id_record: record?.id_record,
+          check_in_time_iso: checkInTimeIso,
+          check_in_time_local: checkInTimeLocal,
+          created_at: record?.created_at,
+          updated_at: record?.updated_at,
+        },
+        server_timestamp: new Date().toISOString(),
+      });
       return NextResponse.json(
         {
           message: "Check-in registered",
-          record: insertResult.rows[0],
+          record,
         },
         { status: 201 }
       );
@@ -130,10 +190,41 @@ WHERE id_user = $1 AND check_out_time IS NULL
 `;
       const updateResult = await query(updateQuery, [recordId]);
       console.log("updateResult",updateResult);
+      const record = updateResult.rows[0];
+      const checkInTimeIso = record?.check_in_time ? new Date(record.check_in_time).toISOString() : null;
+      const checkInTimeLocal = record?.check_in_time ? new Date(record.check_in_time).toLocaleString("es-BO", { timeZone: "America/La_Paz" }) : null;
+      const checkOutTimeIso = record?.check_out_time ? new Date(record.check_out_time).toISOString() : null;
+      const checkOutTimeLocal = record?.check_out_time ? new Date(record.check_out_time).toLocaleString("es-BO", { timeZone: "America/La_Paz" }) : null;
+      await sendAttendanceWebhook({
+        event: "check_out",
+        source: "attendance_api",
+        rfid,
+        user: {
+          id: userId,
+          name: userInfo.user_name,
+          email: userInfo.email,
+          phone_number: userInfo.phone_number,
+          birthdate: userInfo.birthdate,
+          role: userInfo.role_name,
+          university: userInfo.university_name,
+          card_rfid: userInfo.card_rfid || rfid,
+        },
+        record: {
+          id_record: record?.id_record,
+          check_in_time_iso: checkInTimeIso,
+          check_in_time_local: checkInTimeLocal,
+          check_out_time_iso: checkOutTimeIso,
+          check_out_time_local: checkOutTimeLocal,
+          total_hours: record?.total_hours,
+          created_at: record?.created_at,
+          updated_at: record?.updated_at,
+        },
+        server_timestamp: new Date().toISOString(),
+      });
       return NextResponse.json(
         {
           message: "Check-out registered",
-          record: updateResult.rows[0],
+          record,
         },
         { status: 200 }
       );
