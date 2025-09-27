@@ -143,6 +143,8 @@ export function AttendanceRecordsTable() {
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null)
   const [page, setPage] = useState<number>(1)
   const [pageSize] = useState<number>(10)
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   // Filtrar registros basados en búsqueda y rango de fechas
   const filteredRecords = attendanceRecords.filter((record) => {
@@ -184,6 +186,22 @@ export function AttendanceRecordsTable() {
   const handleManualAttendance = (record: AttendanceRecord) => {
     setSelectedRecord(record)
     setIsAttendanceDialogOpen(true)
+  }
+
+  const openExportConfirm = () => {
+    setIsExportDialogOpen(true)
+  }
+
+  const confirmExport = async () => {
+    // Placeholder: aquí iría la llamada al endpoint de exportación
+    setIsExporting(true)
+    try {
+      // await fetch('/api/attendance_record/export', { method: 'POST', body: JSON.stringify({ ... }) })
+      console.log("Exportar Excel - registros:", filteredRecords.length)
+    } finally {
+      setIsExporting(false)
+      setIsExportDialogOpen(false)
+    }
   }
 
   // Función para formatear intervalos de tiempo (PostgreSQL INTERVAL)
@@ -269,7 +287,7 @@ export function AttendanceRecordsTable() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={openExportConfirm}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
                 Exportar a Excel
               </DropdownMenuItem>
@@ -281,6 +299,34 @@ export function AttendanceRecordsTable() {
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Modal de confirmación de exportación */}
+      <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Confirmar exportación</DialogTitle>
+            <DialogDescription>
+              Se exportarán {filteredRecords.length} registro(s) en formato Excel
+              {dateRange?.from && (
+                <>
+                  {" "}para el rango {format(dateRange.from, "dd/MM/yyyy")} {dateRange?.to ? `- ${format(dateRange.to, "dd/MM/yyyy")}` : ""}.
+                </>
+              )}
+              {!dateRange?.from && 
+                <> aplicando los filtros actuales.</>
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsExportDialogOpen(false)} disabled={isExporting}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmExport} disabled={isExporting || filteredRecords.length === 0}>
+              {isExporting ? "Exportando..." : "Exportar Excel"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="rounded-md border">
         <Table>

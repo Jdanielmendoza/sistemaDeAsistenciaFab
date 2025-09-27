@@ -16,6 +16,14 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production'
       }
+    },
+    {
+      name: 'ngrok',
+      script: 'C:/Users/jpazo/AppData/Local/Microsoft/WindowsApps/ngrok.exe',
+      args: 'http --url=civil-seahorse-rightly.ngrok-free.app 5678',
+      interpreter: 'none',
+      autorestart: true,
+      watch: false
     }
   ]
 }; 

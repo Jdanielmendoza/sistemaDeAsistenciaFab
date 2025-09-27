@@ -4,8 +4,6 @@ import { useState, useEffect, useMemo } from "react"
 import {
   CalendarIcon,
   Download,
-  FileSpreadsheet,
-  FileIcon as FilePdf,
   Search,
   Edit,
   Clock,
@@ -33,7 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+//
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { Toggle } from "@/components/ui/toggle"
@@ -115,6 +113,8 @@ export function VolunteerAttendanceTable() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<any>(null)
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   const [records, setRecords] = useState<AttendanceRecordItem[]>([]);
   const [page, setPage] = useState<number>(1)
@@ -179,6 +179,40 @@ export function VolunteerAttendanceTable() {
   const handleManualAttendance = (record: any) => {
     setSelectedRecord(record)
     setIsAttendanceDialogOpen(true)
+  }
+
+  const openExportConfirm = () => {
+    setIsExportDialogOpen(true)
+  }
+
+  const confirmExport = async () => {
+    setIsExporting(true)
+    try {
+      const payload: any = {
+        search: searchTerm,
+        onlyPresent,
+        ...(range && range.from ? { from: format(range.from, "yyyy-MM-dd") } : {}),
+        ...(range && range.to ? { to: format(range.to, "yyyy-MM-dd") } : {}),
+      }
+      const res = await fetch("/api/attendance_record/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error("No se pudo exportar")
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `asistencia_${new Date().toISOString().slice(0,10)}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } finally {
+      setIsExporting(false)
+      setIsExportDialogOpen(false)
+    }
   }
 
   return (
@@ -274,27 +308,39 @@ export function VolunteerAttendanceTable() {
             <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")}/>
           </Button>
 
-          {/* Export dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <Download className="mr-2 h-4 w-4" /> Exportar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>
-                <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <FileSpreadsheet className="mr-2 h-4 w-4" /> CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <FilePdf className="mr-2 h-4 w-4" /> PDF
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Export button */}
+          <Button variant="outline" onClick={openExportConfirm}>
+            <Download className="mr-2 h-4 w-4" /> Exportar
+          </Button>
         </div>
       </div>
+
+      {/* Modal de confirmación de exportación */}
+      <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Confirmar exportación</DialogTitle>
+            <DialogDescription>
+              Se exportarán {total} registro(s) en formato Excel
+              {range && range.from ? (
+                <>
+                  {" "}para el rango {format(range.from, "dd/MM/yyyy")} {range.to ? `- ${format(range.to, "dd/MM/yyyy")}` : ""}.
+                </>
+              ) : (
+                <> aplicando los filtros actuales.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsExportDialogOpen(false)} disabled={isExporting}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmExport} disabled={isExporting || total === 0}>
+              {isExporting ? "Exportando..." : "Exportar Excel"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="rounded-md border">
         <Table>
