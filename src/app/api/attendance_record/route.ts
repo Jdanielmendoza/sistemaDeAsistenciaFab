@@ -5,6 +5,7 @@ const WEBHOOK_URL = process.env.N8N_ATTENDANCE_WEBHOOK_URL ;
 
 async function sendAttendanceWebhook(payload: any) {
   try {
+    if (!WEBHOOK_URL) return; // Skip if not configured
     await fetch(WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
     const from = url.searchParams.get("from"); // YYYY-MM-DD
     const to = url.searchParams.get("to");     // YYYY-MM-DD
     const onlyPresent = (url.searchParams.get("onlyPresent") || "false").toLowerCase() === "true";
+    const idUserFilter = url.searchParams.get("id_user");
 
     const where: string[] = [];
     const params: any[] = [];
@@ -32,6 +34,11 @@ export async function GET(req: NextRequest) {
     if (search) {
       params.push(`%${search}%`);
       where.push(`LOWER(u.name) LIKE $${params.length}`);
+    }
+
+    if (idUserFilter) {
+      params.push(idUserFilter);
+      where.push(`ar.id_user = $${params.length}`);
     }
 
     if (from) {

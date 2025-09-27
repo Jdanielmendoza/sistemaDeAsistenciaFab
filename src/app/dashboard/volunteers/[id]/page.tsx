@@ -3,9 +3,12 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { format, isValid, parseISO } from "date-fns"
-import { CalendarIcon, IdCard, Mail, Phone, Shield, GraduationCap, User as UserIcon, Pencil, Clock3 } from "lucide-react"
+import type { DateRange } from "react-day-picker"
+import { CalendarIcon, IdCard, Mail, Phone, Shield, GraduationCap, User as UserIcon, Pencil, Clock3, HelpCircle, RefreshCcw } from "lucide-react"
 
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import Pagination from "@/components/ui/pagination"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { SmoothLineChart } from "@/components/ui/line-chart"
+import PieDonut from "@/components/ui/pie-donut"
 
 type Role = { id: string; name: string }
 type University = { id: string; name: string }
@@ -48,6 +52,7 @@ type AttendanceRecord = {
   id_user: string
   check_in_time: string
   check_out_time: string | null
+  total_hours?: string | null
 }
 
 export default function VolunteerProfilePage() {
@@ -72,49 +77,242 @@ export default function VolunteerProfilePage() {
   const [cardNumberInput, setCardNumberInput] = useState<string>("")
   const [isEditingCard, setIsEditingCard] = useState<boolean>(false)
   const [isEditingSchedule, setIsEditingSchedule] = useState<boolean>(false)
+  const [isEditingInfo, setIsEditingInfo] = useState<boolean>(false)
   const [selectedDays, setSelectedDays] = useState<string[]>([])
   const [timesByDay, setTimesByDay] = useState<Record<string, { startTime: string; endTime: string }>>({})
   const [isSavingSchedule, setIsSavingSchedule] = useState<boolean>(false)
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
+  const [tablePage, setTablePage] = useState<number>(1)
+  const [tablePageSize] = useState<number>(10)
+  const [chartRange, setChartRange] = useState<DateRange | undefined>()
+  const [initialRange, setInitialRange] = useState<DateRange | undefined>()
   const chartPoints = useMemo(() => {
-    // Datos de Database.sql: AttendanceRecord con check_in_time, check_out_time
-    // Graficamos minutos por día (últimos 14 días) y usamos etiquetas de día (DD/MM)
+    // Construir serie por día en el rango seleccionado (o primer-último registro)
+    const userRecords = attendance.filter((r) => !!r.check_in_time)
+    if (userRecords.length === 0) return []
+
+    // Determinar rango
+    const minDateAll = userRecords.reduce((min, r) => {
+      const d = new Date(r.check_in_time)
+      return d < min ? d : min
+    }, new Date(userRecords[0].check_in_time))
+    const maxDateAll = userRecords.reduce((max, r) => {
+      const d = new Date(r.check_out_time ?? r.check_in_time)
+      return d > max ? d : max
+    }, new Date(userRecords[0].check_out_time ?? userRecords[0].check_in_time))
+
+    const rangeFrom = chartRange?.from ? new Date(chartRange.from) : minDateAll
+    const rangeTo = chartRange?.to ? new Date(chartRange.to) : maxDateAll
+
+    // Normalizar a día local (00:00 - 23:59)
+    const start = new Date(rangeFrom)
+    start.setHours(0, 0, 0, 0)
+    const end = new Date(rangeTo)
+    end.setHours(23, 59, 59, 999)
+
     const byDay = new Map<string, number>()
-    attendance.forEach((r) => {
+    userRecords.forEach((r) => {
       if (!r.check_out_time) return
       const inDate = new Date(r.check_in_time)
       const outDate = new Date(r.check_out_time)
-      const minutes = Math.max(0, Math.round((outDate.getTime() - inDate.getTime()) / 60000))
-      const key = inDate.toISOString().slice(0, 10)
-      byDay.set(key, (byDay.get(key) || 0) + minutes)
+      if (outDate < start || inDate > end) return
+      const ms = Math.max(0, outDate.getTime() - inDate.getTime())
+      const hours = ms / 3600000 // horas decimales
+      const keyDate = new Date(inDate)
+      keyDate.setHours(0, 0, 0, 0)
+      const key = keyDate.toISOString().slice(0, 10)
+      byDay.set(key, (byDay.get(key) || 0) + hours)
     })
+
     const days: { x: number; y: number; label: string }[] = []
-    const now = new Date()
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date(now)
-      d.setDate(now.getDate() - i)
+    const d = new Date(start)
+    while (d <= end) {
       const key = d.toISOString().slice(0, 10)
       const y = byDay.get(key) || 0
       const dd = String(d.getDate()).padStart(2, '0')
       const mm = String(d.getMonth() + 1).padStart(2, '0')
       days.push({ x: d.getTime(), y, label: `${dd}/${mm}` })
+      d.setDate(d.getDate() + 1)
     }
     return days
-  }, [attendance])
+  }, [attendance, chartRange])
+
+  // Gráfica corregida: prorratea horas de cada sesión por día y marca entrada/salida
+  const chartPointsProrated = useMemo(() => {
+    const userRecords = attendance.filter((r) => !!r.check_in_time)
+    if (userRecords.length === 0) return [] as { x: number; y: number; label: string }[]
+
+    const minDateAll = userRecords.reduce((min, r) => {
+      const d = new Date(r.check_in_time)
+      return d < min ? d : min
+    }, new Date(userRecords[0].check_in_time))
+    const maxDateAll = userRecords.reduce((max, r) => {
+      const d = new Date(r.check_out_time ?? r.check_in_time)
+      return d > max ? d : max
+    }, new Date(userRecords[0].check_out_time ?? userRecords[0].check_in_time))
+
+    const rangeFrom = chartRange?.from ? new Date(chartRange.from) : minDateAll
+    const rangeTo = chartRange?.to ? new Date(chartRange.to) : maxDateAll
+
+    const start = new Date(rangeFrom)
+    start.setHours(0, 0, 0, 0)
+    const end = new Date(rangeTo)
+    end.setHours(23, 59, 59, 999)
+
+    const byDay = new Map<string, number>()
+    const flags = new Map<string, { in: boolean; out: boolean }>()
+
+    const dayKey = (d: Date) => {
+      const c = new Date(d)
+      c.setHours(0, 0, 0, 0)
+      return c.toISOString().slice(0, 10)
+    }
+
+    userRecords.forEach((r) => {
+      const inDate = new Date(r.check_in_time)
+      const outDate = new Date(r.check_out_time ?? r.check_in_time)
+      if (outDate < start || inDate > end) return
+
+      // Marcar flags de eventos por día
+      const inKey = dayKey(inDate)
+      const outKey = r.check_out_time ? dayKey(outDate) : undefined
+      flags.set(inKey, { ...(flags.get(inKey) || { in: false, out: false }), in: true })
+      if (outKey) flags.set(outKey, { ...(flags.get(outKey) || { in: false, out: false }), out: true })
+
+      // Prorratear horas por cada día que toca la sesión
+      let cursor = new Date(inDate)
+      if (cursor < start) cursor = new Date(start)
+      const sessionEnd = outDate > end ? new Date(end) : outDate
+
+      while (cursor <= sessionEnd) {
+        const dayStart = new Date(cursor)
+        dayStart.setHours(0, 0, 0, 0)
+        const dayEnd = new Date(dayStart)
+        dayEnd.setHours(23, 59, 59, 999)
+
+        const overlapStart = new Date(Math.max(dayStart.getTime(), inDate.getTime(), start.getTime()))
+        const overlapEnd = new Date(Math.min(dayEnd.getTime(), sessionEnd.getTime()))
+        const ms = Math.max(0, overlapEnd.getTime() - overlapStart.getTime())
+        const hours = ms / 3600000
+        const key = dayKey(dayStart)
+        if (hours > 0) byDay.set(key, (byDay.get(key) || 0) + hours)
+
+        // avanzar al siguiente día
+        const next = new Date(dayStart)
+        next.setDate(next.getDate() + 1)
+        cursor = next
+      }
+    })
+
+    const points: { x: number; y: number; label: string }[] = []
+    const d = new Date(start)
+    while (d <= end) {
+      const key = dayKey(d)
+      const y = byDay.get(key) || 0
+      const dd = String(d.getDate()).padStart(2, '0')
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const f = flags.get(key)
+      const badge = f ? (f.in && f.out ? "(E,S)" : f.in ? "(E)" : f.out ? "(S)" : "") : ""
+      points.push({ x: d.getTime(), y, label: `${dd}/${mm} ${badge}`.trim() })
+      d.setDate(d.getDate() + 1)
+    }
+
+    return points
+  }, [attendance, chartRange])
+
+  // Helpers para la tabla
+  const toDecimalHours = (intervalOrIn: string | null | undefined, out?: string | null): number => {
+    if (intervalOrIn && typeof intervalOrIn === "string" && intervalOrIn.includes(":")) {
+      const parts = intervalOrIn.split(":")
+      if (parts.length >= 2) {
+        const h = parseInt(parts[0] || "0", 10)
+        const m = parseInt(parts[1] || "0", 10)
+        const s = parts[2] ? parseInt(parts[2], 10) : 0
+        return h + m / 60 + s / 3600
+      }
+    }
+    if (intervalOrIn && out) {
+      const a = new Date(intervalOrIn)
+      const b = new Date(out)
+      const ms = Math.max(0, b.getTime() - a.getTime())
+      return ms / 3600000
+    }
+    return 0
+  }
+
+  const formatHoursHM = (hoursDecimal: number): string => {
+    const totalMinutes = Math.max(0, Math.round(hoursDecimal * 60))
+    const hours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
+    return `${hours} h ${minutes} min`
+  }
+
+  const filteredRows = useMemo(() => {
+    if (attendance.length === 0) return [] as AttendanceRecord[]
+    const userRecords = attendance
+    const minDateAll = new Date(userRecords[0].check_in_time)
+    const maxDateAll = new Date(userRecords[userRecords.length - 1].check_out_time ?? userRecords[userRecords.length - 1].check_in_time)
+    const rangeFrom = chartRange?.from ? new Date(chartRange.from) : minDateAll
+    const rangeTo = chartRange?.to ? new Date(chartRange.to) : maxDateAll
+    const start = new Date(rangeFrom); start.setHours(0,0,0,0)
+    const end = new Date(rangeTo); end.setHours(23,59,59,999)
+    return userRecords.filter((r) => {
+      const inDate = new Date(r.check_in_time)
+      const outDate = r.check_out_time ? new Date(r.check_out_time) : inDate
+      return outDate >= start && inDate <= end
+    })
+  }, [attendance, chartRange])
+
+  const totalRows = filteredRows.length
+  const pageStart = (tablePage - 1) * tablePageSize
+  const pageEnd = pageStart + tablePageSize
+  const pageRows = useMemo(() => filteredRows.slice(pageStart, pageEnd), [filteredRows, pageStart, pageEnd])
+
+  useEffect(() => { setTablePage(1) }, [chartRange])
+
+  // Datos para donut: horas por día de la semana (prorrateadas) en el rango
+  const donutByWeekday = useMemo(() => {
+    const map = new Map<number, number>()
+    chartPointsProrated.forEach((p) => {
+      const d = new Date(p.x)
+      const wd = d.getDay() // 0..6
+      map.set(wd, (map.get(wd) || 0) + p.y)
+    })
+    const labels = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"]
+    return Array.from(map.entries()).sort((a,b)=>a[0]-b[0]).map(([k,v]) => ({ label: labels[k], value: v }))
+  }, [chartPointsProrated])
 
   useEffect(() => {
     if (!userId) return
 
+    const fetchAllAttendanceForUser = async (uid: string) => {
+      const pageSize = 100
+      let page = 1
+      const all: AttendanceRecord[] = []
+      // loop pages until we collect 'total'
+      // avoid infinite loops by capping iterations
+      for (let iter = 0; iter < 100; iter++) {
+        const res = await fetch(`/api/attendance_record?id_user=${encodeURIComponent(uid)}&page=${page}&pageSize=${pageSize}`)
+        if (!res.ok) break
+        const payload = await res.json().catch(() => ({}))
+        const records: AttendanceRecord[] = Array.isArray(payload) ? payload : (payload?.records || [])
+        const total: number = payload?.total ?? records.length
+        all.push(...records)
+        if (all.length >= total || records.length === 0) break
+        page += 1
+      }
+      return all
+    }
+
     const loadAll = async () => {
       try {
         setIsLoading(true)
-        const [userRes, rolesRes, univRes, cardsRes, scheduleRes, attendanceRes] = await Promise.all([
+        const [userRes, rolesRes, univRes, cardsRes, scheduleRes] = await Promise.all([
           fetch(`/api/users/${userId}`),
           fetch(`/api/roles`),
           fetch(`/api/university`),
           fetch(`/api/cards`),
           fetch(`/api/schedule`),
-          fetch(`/api/attendance_record`),
         ])
 
         if (!userRes.ok) throw new Error("No se pudo cargar el usuario")
@@ -124,8 +322,7 @@ export default function VolunteerProfilePage() {
         const univData: University[] = univRes.ok ? await univRes.json() : []
         const cardsData: CardInfo[] = cardsRes.ok ? await cardsRes.json() : []
         const scheduleData: ScheduleRow[] = scheduleRes.ok ? await scheduleRes.json() : []
-        const attendancePayload = attendanceRes.ok ? await attendanceRes.json() : { records: [] }
-        const attendanceData: AttendanceRecord[] = Array.isArray(attendancePayload) ? attendancePayload : (attendancePayload?.records || [])
+        const attendanceData: AttendanceRecord[] = await fetchAllAttendanceForUser(userId)
 
         setRoles(rolesData)
         setUniversities(univData)
@@ -171,7 +368,21 @@ export default function VolunteerProfilePage() {
         setTimesByDay(initTimes)
 
         // Attendance records (filter by user)
-        setAttendance(attendanceData.filter((r) => r.id_user === userId))
+        const userRecs = attendanceData.filter((r) => r.id_user === userId)
+        setAttendance(userRecs)
+        if (userRecs.length > 0) {
+          const minD = userRecs.reduce((min, r) => {
+            const d = new Date(r.check_in_time)
+            return d < min ? d : min
+          }, new Date(userRecs[0].check_in_time))
+          const maxD = userRecs.reduce((max, r) => {
+            const d = new Date(r.check_out_time ?? r.check_in_time)
+            return d > max ? d : max
+          }, new Date(userRecs[0].check_out_time ?? userRecs[0].check_in_time))
+          const rng = { from: minD, to: maxD }
+          setInitialRange(rng)
+          setChartRange((prev) => prev ?? rng)
+        }
       } catch (error) {
         toast.error("Error cargando el perfil")
       } finally {
@@ -414,8 +625,16 @@ export default function VolunteerProfilePage() {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Main form */}
           <Card className="xl:col-span-2 overflow-hidden">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><UserIcon className="h-5 w-5" /> Información del voluntario</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">{/* <UserIcon className="h-5 w-5" /> */}
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
+                  {name?.[0]?.toUpperCase() || "U"}
+                </div>
+               Información de {name}
+              </CardTitle>
+              <Button variant="ghost" size="icon" aria-label="Editar información" onClick={() => setIsEditingInfo((v) => !v)}>
+                <Pencil className="h-4 w-4" />
+              </Button>
             </CardHeader>
             <CardContent>
               <form onSubmit={onSubmit} className="space-y-6">
@@ -424,7 +643,7 @@ export default function VolunteerProfilePage() {
                     <Label>Nombre</Label>
                     <div className="relative">
                       <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input className="pl-9" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre completo" />
+                      <Input className="pl-9" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre completo" disabled={!isEditingInfo} />
                     </div>
                   </div>
 
@@ -432,7 +651,7 @@ export default function VolunteerProfilePage() {
                     <Label>Correo</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input className="pl-9" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@correo.com" />
+                      <Input className="pl-9" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@correo.com" disabled={!isEditingInfo} />
                     </div>
                   </div>
 
@@ -440,7 +659,7 @@ export default function VolunteerProfilePage() {
                     <Label>Teléfono</Label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input className="pl-9" inputMode="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="71024518" />
+                      <Input className="pl-9" inputMode="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="71024518" disabled={!isEditingInfo} />
                     </div>
                   </div>
 
@@ -451,6 +670,7 @@ export default function VolunteerProfilePage() {
                         <Button
                           variant={"outline"}
                           className={cn("w-full justify-between", !birthdate && "text-muted-foreground")}
+                          disabled={!isEditingInfo}
                         >
                           {birthdate && isValid(birthdate) ? format(birthdate, "PPP") : <span>Selecciona una fecha</span>}
                           <CalendarIcon className="ml-2 h-4 w-4 opacity-50" />
@@ -473,7 +693,7 @@ export default function VolunteerProfilePage() {
                     <Label>Rol</Label>
                     <div className="relative">
                       <Shield className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Select value={idRole} onValueChange={setIdRole}>
+                      <Select value={idRole} onValueChange={setIdRole} disabled={!isEditingInfo}>
                         <SelectTrigger className="w-full pl-9">
                           <SelectValue placeholder="Selecciona un rol" />
                         </SelectTrigger>
@@ -490,7 +710,7 @@ export default function VolunteerProfilePage() {
                     <Label>Universidad</Label>
                     <div className="relative">
                       <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Select value={idUniversity ?? "none"} onValueChange={setIdUniversity}>
+                      <Select value={idUniversity ?? "none"} onValueChange={setIdUniversity} disabled={!isEditingInfo}>
                         <SelectTrigger className="w-full pl-9">
                           <SelectValue placeholder="Selecciona una universidad" />
                         </SelectTrigger>
@@ -504,33 +724,145 @@ export default function VolunteerProfilePage() {
                     </div>
                   </div>
                 </div>
-
+                {isEditingInfo && (
                 <div className="flex justify-end gap-2 pt-2">
-                  <Button type="button" variant="outline" onClick={() => router.push("/dashboard/volunteers")}>Cancelar</Button>
+                    <Button type="button" variant="outline" onClick={() => setIsEditingInfo(false)}>Cancelar</Button>
                   <Button type="submit" disabled={isSaving}>{isSaving ? "Guardando..." : "Guardar cambios"}</Button>
                 </div>
+                )}
               </form>
             </CardContent>
             <CardFooter>
               <div className="w-full">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm text-muted-foreground">Horas registradas (min) últimos 14 días</div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="rounded-full bg-primary/10 text-primary px-2 py-1">
-                      Total: {Math.round(chartPoints.reduce((a, b) => a + b.y, 0))} min
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-sm text-muted-foreground">Horas registradas por día (min)</div>
+                  <div className="flex items-center gap-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="justify-start text-left font-normal">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {chartRange?.from ? (
+                            chartRange?.to ? (
+                              <>
+                                {format(chartRange.from, "dd/MM/yyyy")} - {format(chartRange.to, "dd/MM/yyyy")}
+                              </>
+                            ) : (
+                              format(chartRange.from, "dd/MM/yyyy")
+                            )
+                          ) : (
+                            <span>Rango</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="end">
+                        <Calendar
+                          initialFocus
+                          mode="range"
+                          selected={chartRange}
+                          onSelect={(val: any) => setChartRange(val ?? undefined)}
+                          numberOfMonths={2}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label="Restablecer rango"
+                      onClick={() => {
+                        if (initialRange?.from && initialRange?.to) {
+                          setChartRange({ from: new Date(initialRange.from), to: new Date(initialRange.to) })
+                        } else if (attendance.length > 0) {
+                          const minD = attendance.reduce((min, r) => {
+                            const d = new Date(r.check_in_time)
+                            return d < min ? d : min
+                          }, new Date(attendance[0].check_in_time))
+                          const maxD = attendance.reduce((max, r) => {
+                            const d = new Date(r.check_out_time ?? r.check_in_time)
+                            return d > max ? d : max
+                          }, new Date(attendance[0].check_out_time ?? attendance[0].check_in_time))
+                          setChartRange({ from: minD, to: maxD })
+                        }
+                      }}
+                    >
+                      <RefreshCcw className="h-4 w-4" />
+                    </Button>
+                    <span className="rounded-full bg-primary/10 text-primary px-2 py-1 text-xs">
+                      Total: {(() => { const h = chartPoints.reduce((a, b) => a + b.y, 0); return h.toFixed(2) })()} h
                     </span>
-                    <span className="rounded-full bg-emerald-100 text-emerald-600 px-2 py-1">
-                      Pico: {(() => { const m = chartPoints.reduce((max, p) => p.y > max ? p.y : max, 0); return Math.round(m) })()} min
+                    <span className="rounded-full bg-emerald-100 text-emerald-600 px-2 py-1 text-xs">
+                      Pico: {(() => { const m = chartPoints.reduce((max, p) => p.y > max ? p.y : max, 0); return m.toFixed(2) })()} h
                     </span>
                   </div>
+                </div>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-xs text-muted-foreground">Gráfica original (puede mostrar &gt;24 h si una sesión cruza días)</div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button size="icon" variant="ghost" className="h-6 w-6" aria-label="Ayuda gráfica original">
+                        <HelpCircle className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 text-sm" align="end">
+                      Muestra horas por día sumando cada sesión al día de entrada. Si una sesión dura más de un día, ese día puede exceder 24 h. Usa horas decimales; el tooltip muestra día y duración formateada.
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="rounded-md border bg-background p-2 animate-in fade-in-50">
                   <SmoothLineChart
                     data={chartPoints}
                     width={900}
                     height={200}
-                    valueFormatter={(v) => `${Math.round(v)} min`}
+                    valueFormatter={(v) => `${v.toFixed(2)} h`}
+                    tooltipTitle={(x, label) => {
+                      const d = new Date(x)
+                      const days = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"]
+                      return `${days[d.getDay()]} ${label}`
+                    }}
+                    tooltipFormatter={(v) => {
+                      const hours = Math.floor(v)
+                      const minutes = Math.round((v - hours) * 60)
+                      return `${hours} h ${minutes} min`
+                    }}
+                    xTickMode="auto"
+                    maxXTicks={10}
+                    xLabelAngle={0}
                   />
+                </div>
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-xs text-muted-foreground">Horas por día (prorrateadas) — etiquetas (E)=Entrada, (S)=Salida</div>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" aria-label="Ayuda gráfica prorrateada">
+                          <HelpCircle className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 text-sm" align="end">
+                        Reparte cada sesión entre los días que atraviesa: cuenta solo las horas dentro de cada día. Ningún día supera 24 h. Muestra marcadores (E) y (S) cuando hubo entrada/salida.
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="rounded-md border bg-background p-2 animate-in fade-in-50">
+                  <SmoothLineChart
+                    data={chartPointsProrated}
+                    width={900}
+                    height={200}
+                    valueFormatter={(v) => `${v.toFixed(2)} h`}
+                    tooltipTitle={(x, label) => {
+                      const d = new Date(x)
+                      const days = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"]
+                      return `${days[d.getDay()]} ${label}`
+                    }}
+                    tooltipFormatter={(v) => {
+                      const hours = Math.floor(v)
+                      const minutes = Math.round((v - hours) * 60)
+                      return `${hours} h ${minutes} min`
+                    }}
+                    xTickMode="auto"
+                    maxXTicks={10}
+                    xLabelAngle={0}
+                  />
+                  </div>
                 </div>
               </div>
             </CardFooter>
@@ -538,9 +870,29 @@ export default function VolunteerProfilePage() {
 
           {/* Sidebar info */}
           <div className="space-y-6">
+            {/* Donut compacto debajo del resumen */}
             <Card>
+              <CardHeader className="flex flex-row items-center justify-between py-3">
+                <CardTitle className="text-base">Distribución semanal</CardTitle>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button size="icon" variant="ghost" className="h-6 w-6" aria-label="Ayuda donut semanal">
+                      <HelpCircle className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 text-sm" align="end">
+                    Muestra qué porcentaje de horas del rango cae en cada día de la semana. Útil para ver los días más activos.
+                  </PopoverContent>
+                </Popover>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <PieDonut data={donutByWeekday} height={200} valueFormatter={(v) => `${v.toFixed(2)} h`} />
+              </CardContent>
+            </Card>
+
+            {/* <Card>
               <CardHeader>
-                <CardTitle className="text-base">Resumen</CardTitle>
+                <CardTitle className="text-base">Resumen del voluntario</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-3">
@@ -561,7 +913,7 @@ export default function VolunteerProfilePage() {
                   <div className="font-medium">{universities.find(u => u.id === (idUniversity ?? ""))?.name || "Ninguna"}</div>
                 </div>
               </CardContent>
-            </Card>
+            </Card> */}
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
@@ -688,6 +1040,60 @@ export default function VolunteerProfilePage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Tabla de registros del voluntario */}
+          <Card className="xl:col-span-3">
+            <CardHeader>
+              <CardTitle className="text-base">Registros de asistencia de {name}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha entrada</TableHead>
+                      <TableHead>Hora entrada</TableHead>
+                      <TableHead>Fecha salida</TableHead>
+                      <TableHead>Hora salida</TableHead>
+                      <TableHead className="text-right">Total horas</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pageRows.length > 0 ? (
+                      pageRows.map((r) => {
+                        const inD = new Date(r.check_in_time)
+                        const outD = r.check_out_time ? new Date(r.check_out_time) : null
+                        const inDate = `${String(inD.getDate()).padStart(2, '0')}/${String(inD.getMonth()+1).padStart(2, '0')}/${inD.getFullYear()}`
+                        const inTime = `${String(inD.getHours()).padStart(2, '0')}:${String(inD.getMinutes()).padStart(2, '0')}`
+                        const outDate = outD ? `${String(outD.getDate()).padStart(2, '0')}/${String(outD.getMonth()+1).padStart(2, '0')}/${outD.getFullYear()}` : "-"
+                        const outTime = outD ? `${String(outD.getHours()).padStart(2, '0')}:${String(outD.getMinutes()).padStart(2, '0')}` : "-"
+                        const hours = r.total_hours ? toDecimalHours(r.total_hours) : (outD ? toDecimalHours(r.check_in_time, r.check_out_time) : 0)
+                        return (
+                          <TableRow key={r.id_record}>
+                            <TableCell>{inDate}</TableCell>
+                            <TableCell>{inTime}</TableCell>
+                            <TableCell>{outDate}</TableCell>
+                            <TableCell>{outTime}</TableCell>
+                            <TableCell className="text-right">{r.check_out_time ? formatHoursHM((new Date(r.check_out_time).getTime() - new Date(r.check_in_time).getTime()) / 3600000) : (r.total_hours ? formatHoursHM(toDecimalHours(r.total_hours)) : "-")}</TableCell>
+                          </TableRow>
+                        )
+                      })
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-24 text-center">Sin registros</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <div className="text-sm text-muted-foreground">
+                  Mostrando {totalRows === 0 ? 0 : pageStart + 1} a {Math.min(totalRows, pageEnd)} de {totalRows} resultado(s)
+                </div>
+                <Pagination page={tablePage} total={totalRows} pageSize={tablePageSize} onPageChange={setTablePage} />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </main>

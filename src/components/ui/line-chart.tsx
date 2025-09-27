@@ -12,6 +12,11 @@ export function SmoothLineChart({
   fill = "hsl(var(--primary) / 0.18)",
   strokeWidth = 2,
   valueFormatter = (y: number) => `${y}`,
+  tooltipFormatter,
+  tooltipTitle,
+  maxXTicks = 12,
+  xTickMode = "auto",
+  xLabelAngle = 0,
   className,
 }: {
   width?: number
@@ -21,6 +26,11 @@ export function SmoothLineChart({
   fill?: string
   strokeWidth?: number
   valueFormatter?: (y: number) => string
+  tooltipFormatter?: (y: number, x?: number, label?: string) => string
+  tooltipTitle?: (x: number, label: string) => string
+  maxXTicks?: number
+  xTickMode?: "auto" | "all" | "week" | "month"
+  xLabelAngle?: number
   className?: string
 }) {
   const padding = 28
@@ -28,15 +38,27 @@ export function SmoothLineChart({
   const containerRef = useRef<HTMLDivElement>(null)
 
   const { points, path, areaPath, yTicks, xTicks, yMin, yMax } = useMemo(() => {
-    const xs = data.map((p, i) => i)
+    const n = data.length
     const ys = data.map((p) => p.y)
     const minX = 0
-    const maxX = Math.max(1, data.length - 1)
+    const maxX = Math.max(1, n - 1)
     const minY = Math.min(0, ...ys)
     const maxY = Math.max(1, ...ys)
     const scaleX = (x: number) => padding + ((x - minX) / (maxX - minX || 1)) * (width - padding * 2)
     const scaleY = (y: number) => height - padding - ((y - minY) / (maxY - minY || 1)) * (height - padding * 2)
 
+    if (n === 0) {
+      // No data: return safe defaults
+      const steps = 4
+      const zeroTicks = Array.from({ length: steps + 1 }, (_, i) => {
+        const t = i / steps
+        const val = (1 - t) // 1..0
+        return { y: scaleY(val), value: val }
+      })
+      return { points: [], path: "", areaPath: "", yTicks: zeroTicks, xTicks: [], yMin: 0, yMax: 1 }
+    }
+
+    const xs = data.map((_, i) => i)
     const pts = xs.map((x, i) => ({ X: scaleX(x), Y: scaleY(ys[i]), label: data[i].label, rawX: x, rawY: ys[i] }))
 
     const d: string[] = []
@@ -51,7 +73,9 @@ export function SmoothLineChart({
       }
     }
     const pathStr = d.join(" ")
-    const area = `${pathStr} L ${pts[pts.length - 1].X} ${height - padding} L ${pts[0].X} ${height - padding} Z`
+    const area = pts.length >= 2
+      ? `${pathStr} L ${pts[pts.length - 1].X} ${height - padding} L ${pts[0].X} ${height - padding} Z`
+      : ""
 
     // y ticks (4 lines)
     const steps = 4
@@ -60,14 +84,48 @@ export function SmoothLineChart({
       const val = minY + (maxY - minY) * (1 - t)
       return { y: scaleY(val), value: val }
     })
-    // x ticks: adaptive downsampling to avoid overlap
-    const n = data.length
-    const available = width - padding * 2
-    const approxLabel = 28 // px per label
-    const step = Math.max(1, Math.ceil((n * approxLabel) / Math.max(1, available)))
-    const xTicks = Array.from({ length: n }, (_, i) => i).filter((i) => i % step === 0 || i === n - 1)
+    // x ticks: modo automático por rango temporal con límite de cantidad
+    let indices = Array.from({ length: n }, (_, i) => i)
+    if (n > 0) {
+      const firstX = data[0].x
+      const lastX = data[n - 1].x
+      const spanDays = Math.max(1, Math.round((lastX - firstX) / 86400000))
+
+      let mode: "all" | "week" | "month" = "all"
+      if (xTickMode === "auto") {
+        if (spanDays <= 45) mode = "all"
+        else if (spanDays <= 180) mode = "week"
+        else mode = "month"
+      } else {
+        mode = xTickMode
+      }
+
+      if (mode === "week") {
+        const weekly = indices.filter((i) => {
+          const d = new Date(data[i].x)
+          return d.getDay() === 1 // lunes
+        })
+        indices = [0, ...weekly, n - 1]
+      } else if (mode === "month") {
+        const monthly = indices.filter((i) => {
+          const d = new Date(data[i].x)
+          return d.getDate() === 1
+        })
+        indices = [0, ...monthly, n - 1]
+      }
+
+      // limitar a maxXTicks
+      if (indices.length > maxXTicks) {
+        const step = Math.ceil(indices.length / maxXTicks)
+        indices = indices.filter((_, idx) => idx % step === 0)
+        // asegurar último
+        if (indices[indices.length - 1] !== n - 1) indices.push(n - 1)
+      }
+    }
+
+    const xTicks = indices
     return { points: pts, path: pathStr, areaPath: area, yTicks, xTicks, yMin: minY, yMax: maxY }
-  }, [data, width, height])
+  }, [data, width, height, xTickMode, maxXTicks])
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!containerRef.current || points.length === 0) return
@@ -108,11 +166,16 @@ export function SmoothLineChart({
           </g>
         ))}
         {/* x labels */}
-        {xTicks.map((i, idx) => (
-          <text key={`x-${idx}`} x={points[i]?.X || padding} y={height - 6} fontSize={10} textAnchor="middle" fill="hsl(var(--muted-foreground))">
-            {data[i]?.label || ""}
-          </text>
-        ))}
+        {xTicks.map((i, idx) => {
+          const xi = points[i]?.X ?? padding
+          const anchor = xLabelAngle > 0 ? "end" : "middle"
+          const ty = height - 6
+          return (
+            <text key={`x-${idx}`} x={xi} y={ty} fontSize={10} textAnchor={anchor} fill="hsl(var(--muted-foreground))" transform={xLabelAngle ? `rotate(${xLabelAngle}, ${xi}, ${ty})` : undefined}>
+              {data[i]?.label || ""}
+            </text>
+          )
+        })}
 
         {areaPath && <path d={areaPath} fill="url(#grad)" opacity={1} />}
         {path && (
@@ -142,8 +205,8 @@ export function SmoothLineChart({
           style={{ position: "absolute", left: points[hover].X + 12, top: points[hover].Y - 10 }}
           className="pointer-events-none rounded-md border bg-background px-2 py-1 text-xs shadow-md"
         >
-          <div className="font-medium">{data[hover].label}</div>
-          <div className="text-muted-foreground">{valueFormatter(points[hover].rawY)}</div>
+          <div className="font-medium">{tooltipTitle ? tooltipTitle(data[hover].x, data[hover].label) : data[hover].label}</div>
+          <div className="text-muted-foreground">{(tooltipFormatter ?? valueFormatter)(points[hover].rawY, data[hover].x, data[hover].label)}</div>
         </div>
       )}
     </div>
