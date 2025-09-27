@@ -20,6 +20,7 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
+import Pagination from "@/components/ui/pagination"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
@@ -345,19 +346,7 @@ export function AttendanceRecordsTable() {
         </Table>
       </div>
 
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-          <Button key={p} variant={p === currentPage ? "default" : "outline"} size="sm" onClick={() => setPage(p)}>
-            {p}
-          </Button>
-        ))}
-        <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
+      <Pagination page={currentPage} total={filteredRecords.length} pageSize={pageSize} onPageChange={setPage} />
 
       {/* Modal para editar registro */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

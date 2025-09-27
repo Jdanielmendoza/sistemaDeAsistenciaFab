@@ -38,6 +38,7 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { Toggle } from "@/components/ui/toggle"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import Pagination from "@/components/ui/pagination"
 import { addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns"
 import { type DateRange } from "react-day-picker"
 
@@ -102,6 +103,8 @@ function formatDecimalHours(value: number): string {
   return parts.join(" - ");
 }
 
+// paginación reusable via componente `Pagination`
+
 export function VolunteerAttendanceTable() {
   const [searchTerm, setSearchTerm] = useState("")
   const [date, setDate] = useState<Date | undefined>(undefined)
@@ -165,6 +168,8 @@ export function VolunteerAttendanceTable() {
   const filteredRecords = records
 
   const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize))
+
+  // items calculados dentro del componente Pagination
 
   const handleEdit = (record: any) => {
     setSelectedRecord(record)
@@ -353,19 +358,7 @@ export function VolunteerAttendanceTable() {
         </Table>
       </div>
 
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-          <Button key={p} variant={p === page ? "default" : "outline"} size="sm" onClick={() => setPage(p)}>
-            {p}
-          </Button>
-        ))}
-        <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
+      <Pagination page={page} total={total} pageSize={pageSize} onPageChange={setPage} />
 
       {/* Modal para editar registro */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
